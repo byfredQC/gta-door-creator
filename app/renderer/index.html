@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'sha256-M/P1KeBMJDKt4usglSGT4py0Tpke6PWlEGC2zVbM/AE='" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'sha256-M/P1KeBMJDKt4usglSGT4py0Tpke6PWlEGC2zVbM/AE='" />
   <title>GTA Door Creator</title>
   <link rel="stylesheet" href="styles.css" />
   <script type="importmap">
@@ -210,8 +210,7 @@
       <h2>DOOR SOUND <span class="h-tag">no script</span></h2>
       <select id="snd-select"></select>
       <div class="snd-info" id="snd-info"></div>
-      <div class="snd-play" data-for="snd"></div>
-      <div class="hint">Uses GTA's own door sounds: the export adds a small audio file (game.dat151) that links your door to the chosen sound. ▶ plays the sound from your own GTA V install.</div>
+      <div class="hint">Uses GTA's own door sounds: the export adds a small audio file (game.dat151) that links your door to the chosen sound. Heard in-game only.</div>
     </section>
 
     <section class="panel locked" id="panel-doorsettings">
@@ -344,7 +343,6 @@
       <label class="lbl">Sound</label>
       <select id="so-sound"></select>
       <div class="snd-info" id="so-info"></div>
-      <div class="snd-play" data-for="so"></div>
       <label class="lbl">Audio file name</label>
       <div class="so-file"><input type="text" id="so-file" spellcheck="false" /><span class="muted">_game.dat151.rel</span></div>
       <label class="lbl">fxmanifest.lua lines</label>

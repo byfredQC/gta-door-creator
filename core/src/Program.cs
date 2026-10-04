@@ -28,7 +28,7 @@ namespace DoorCore
             if (args.Length >= 2)
             {
                 var req = new JsonObject { ["id"] = 0, ["cmd"] = args[0] };
-                if (args[0] == "export" || args[0] == "build" || args[0] == "audio" || args[0] == "soundpreview") req = JsonNode.Parse(File.ReadAllText(args[1])).AsObject();
+                if (args[0] == "export" || args[0] == "build" || args[0] == "audio") req = JsonNode.Parse(File.ReadAllText(args[1])).AsObject();
                 else req["path"] = args[1];
                 if (!req.ContainsKey("cmd")) req["cmd"] = args[0];
                 Console.WriteLine(Handle(req).ToJsonString());
@@ -61,7 +61,6 @@ namespace DoorCore
                     "export" => Exporter.Export(req),
                     "build" => TestBuilder.Build(req),
                     "audio" => Audio.Build(req),
-                    "soundpreview" => SoundPreview.Get(req),
                     _ => throw new Exception("Unknown command: " + cmd)
                 };
                 return new JsonObject { ["id"] = id, ["ok"] = true, ["result"] = result };

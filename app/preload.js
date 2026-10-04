@@ -8,7 +8,6 @@ contextBridge.exposeInMainWorld('api', {
   exportFiles: inv('core:export'),
   buildSample: inv('core:buildSample'),
   buildAudio: inv('core:audio'),
-  soundPreview: inv('core:soundPreview'),
   openPropDialog: inv('dialog:openProp'),
   openYbnDialog: inv('dialog:openYbn'),
   chooseFolder: inv('dialog:chooseFolder'),

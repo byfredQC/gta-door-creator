@@ -371,7 +371,6 @@ function refreshSound() {
   $('snd-select').value = d.sound.mode === 'set' ? d.sound.id : d.sound.mode;
   const r = S.model && d.created ? resolveSound() : null;
   const info = $('snd-info');
-  renderPlayers();
   if (!r) { info.innerHTML = d.sound.mode === 'none' ? 'The door will use no sound.' : ''; return; }
   info.innerHTML = `♪ ${esc(r.label)}${r.auto && !r.original ? ' <span class="muted">(default for this door type)</span>' : ''}` +
     (r.examples.length ? `<span class="ex">${r.original ? '' : 'like '}${esc(r.examples.slice(0, 3).join(', '))}</span>` : '') +
@@ -383,92 +382,6 @@ async function writeAudio(dir, a) {
   await api.mkdir(dir);
   await api.buildAudio(joinPath(dir, file), [{ model: a.archetypeName, settings: r.id }]);
   return { file, label: r.label };
-}
-
-// ------------------------------------------------------------------ listen to door sounds (read from the user's own GTA V install, nothing bundled)
-const SP = { cache: new Map(), audio: null, token: 0, playing: null };
-const SP_KEYS = [['all', '▶ PLAY'], ['opening', 'OPEN'], ['closing', 'CLOSE'], ['closed', 'SHUT'], ['push', 'PUSH'], ['limit', 'LIMIT']];
-const GTA_GUESSES = [
-  'C:\\Program Files\\Rockstar Games\\Grand Theft Auto V', 'C:\\Program Files\\Rockstar Games\\Grand Theft Auto V Legacy',
-  'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Grand Theft Auto V', 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Grand Theft Auto V Legacy',
-  'C:\\Program Files\\Epic Games\\GTAV', 'D:\\SteamLibrary\\steamapps\\common\\Grand Theft Auto V', 'D:\\Grand Theft Auto V', 'D:\\Games\\Grand Theft Auto V',
-];
-async function isGtaFolder(f) { try { return !!f && await api.exists(joinPath(f, 'x64', 'audio', 'audio_rel.rpf')); } catch { return false; } }
-async function ensureGta(forceAsk = false) {
-  if (!forceAsk && await isGtaFolder((S.settings || {}).gtaFolder)) return S.settings.gtaFolder;
-  if (!forceAsk) for (const g of GTA_GUESSES) if (await isGtaFolder(g)) { saveGta(g); return g; }
-  const f = await api.chooseFolder('Choose your GTA V folder (the one with GTA5.exe) - door sounds are read from your game');
-  if (!f) return null;
-  if (!(await isGtaFolder(f))) { toast('This is not a GTA V folder (x64\\audio\\audio_rel.rpf not found)', 'err'); return null; }
-  saveGta(f); return f;
-}
-function saveGta(f) {
-  if (S.settings.gtaFolder !== f) { S.settings.gtaFolder = f; delete S.settings.gtaKey; SP.cache.clear(); }
-  api.saveSettings(S.settings); renderPlayers();
-}
-async function soundSamples(id) {
-  if (SP.cache.has(id)) return SP.cache.get(id);
-  const gta = await ensureGta(); if (!gta) return null;
-  toast(S.settings.gtaKey ? 'Loading sound…' : 'Reading GTA V audio (first time takes a few seconds)…');
-  const res = await api.soundPreview(gta, id, S.settings.gtaKey || null);
-  if (res.key && res.key !== S.settings.gtaKey) { S.settings.gtaKey = res.key; api.saveSettings(S.settings); }
-  const out = {};
-  for (const x of res.sounds) {
-    const bin = atob(x.wav), u8 = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-    out[x.name] = URL.createObjectURL(new Blob([u8], { type: 'audio/wav' }));
-  }
-  SP.cache.set(id, out); return out;
-}
-function stopSound() { SP.token++; if (SP.audio) { SP.audio.pause(); SP.audio = null; } SP.playing = null; markPlaying(); }
-function markPlaying() {
-  document.querySelectorAll('.snd-play .btn').forEach((b) => b.classList.toggle('playing', !!SP.playing && b.dataset.k === SP.playing.k && b.parentElement.dataset.for === SP.playing.where));
-}
-function playUrl(url, tok) {
-  return new Promise((res) => {
-    if (tok !== SP.token) return res();
-    const a = new Audio(url); SP.audio = a; a.volume = 0.9;
-    a.onended = a.onerror = () => res(); a.play().catch(() => res());
-  });
-}
-async function playDoorSound(where, k) {
-  const id = playerSoundId(where); if (!id) { toast('No sound selected', 'err'); return; }
-  if (SP.playing && SP.playing.where === where && SP.playing.k === k) { stopSound(); return; }
-  stopSound(); const tok = SP.token;
-  let smp;
-  try { smp = await soundSamples(id); } catch (e) { toast('Cannot read the sound: ' + (e.message || e), 'err'); return; }
-  if (!smp || tok !== SP.token) { renderPlayers(); return; }
-  renderPlayers();
-  SP.playing = { where, k }; markPlaying();
-  const seq = k === 'all' ? ['opening', 'push', 'closing', 'closed'].filter((n) => smp[n]) : [k];
-  for (let i = 0; i < seq.length; i++) {
-    if (!smp[seq[i]]) continue;
-    await playUrl(smp[seq[i]], tok);
-    if (tok !== SP.token) return;
-    if (i < seq.length - 1) await new Promise((r) => setTimeout(r, seq[i] === 'push' ? 150 : 450));
-  }
-  if (tok === SP.token) { SP.playing = null; markPlaying(); }
-}
-function playerSoundId(where) {
-  if (where === 'so') return SO.sound;
-  const snd = S.door.sound || { mode: 'auto' };
-  if (snd.mode === 'none') return null;
-  if (snd.mode === 'set' && snd.id) return snd.id;
-  try { const r = resolveSound(); return r ? r.id : SOUND_DEFAULT[4]; } catch { return SOUND_DEFAULT[4]; }
-}
-function renderPlayers() {
-  document.querySelectorAll('.snd-play').forEach((el) => {
-    const where = el.dataset.for, id = playerSoundId(where), smp = id && SP.cache.get(id);
-    if (el.dataset.id !== String(id) && SP.playing && SP.playing.where === where) stopSound();
-    el.dataset.id = String(id);
-    el.innerHTML = SP_KEYS.map(([k, label]) => {
-      const off = !id || (smp && (k === 'all' ? !Object.keys(smp).length : !smp[k]));
-      return `<button class="btn" data-k="${k}" title="${k === 'all' ? 'Play opening + closing' : 'Play the ' + k + ' sound'}"${off ? ' disabled' : ''}>${label}</button>`;
-    }).join('') + `<button class="gta" title="${esc((S.settings || {}).gtaFolder || 'GTA V folder not set')}">GTA folder…</button>`;
-    el.querySelectorAll('.btn').forEach((b) => { b.onclick = () => playDoorSound(where, b.dataset.k); });
-    el.querySelector('.gta').onclick = async () => { const f = await ensureGta(true); if (f) toast('GTA V folder: ' + f, 'ok'); };
-  });
-  markPlaying();
 }
 
 // ------------------------------------------------------------------ SOUND ONLY tool (doors already made)
@@ -485,7 +398,6 @@ function soRefresh() {
     ? `-- GTA Door Creator : door sound (${names.join(', ')})\nfiles {\n  'audio/${file}',\n}\ndata_file 'AUDIO_GAMEDATA' 'audio/${file.replace('.dat151.rel', '.dat')}'\n`
     : '-- type at least one door model name';
   $('so-create').disabled = !names.length; $('so-copy').disabled = !names.length;
-  renderPlayers();
 }
 function openSoundOnly() {
   const sel = $('so-sound');
@@ -1091,7 +1003,7 @@ function bind() {
 
   // sound only tool
   $('btn-soundonly').onclick = openSoundOnly;
-  $('so-close').onclick = () => { stopSound(); $('so-modal').classList.add('hidden'); };
+  $('so-close').onclick = () => $('so-modal').classList.add('hidden');
   $('so-names').oninput = soRefresh; $('so-file').oninput = soRefresh;
   $('so-sound').onchange = () => { SO.sound = $('so-sound').value; soRefresh(); };
   $('so-fromytyp').onclick = soFromYtyp;
@@ -1242,4 +1154,4 @@ async function boot() {
 boot();
 
 export { S, loadPaths, createDoor, setType, refresh, exportFiveM, doExport, saveProject, openProject, applyPreset, menuCmd };
-window.__app = { S, SP, soundSamples, playDoorSound, loadPaths, createDoor, setType, refresh, exportFiveM, doExport, saveProject, openProject, applyPreset, menuCmd, play, touch, archetype, collisionInfo };
+window.__app = { S, loadPaths, createDoor, setType, refresh, exportFiveM, doExport, saveProject, openProject, applyPreset, menuCmd, play, touch, archetype, collisionInfo };
