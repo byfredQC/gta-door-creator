@@ -39,6 +39,7 @@ Nothing else to install: the release build includes everything (no .NET, no Blen
 | **Door sound** | Uses GTA's own door sounds — **no script**. 47 sounds from the game (wood, glass shop, fire door, jail bars, garage, roller shutter, prison gate…). Vanilla models keep their original sound automatically. |
 | **YTYP** | Live archetype preview (summary / XML), flags, LOD, HD LOD, texture dictionary. |
 | **Export** | `EXPORT YDR / YTYP / YBN / ALL` and **EXPORT FIVEM RESOURCE**. |
+| **Sound only** | Already made a door? **♪ SOUND ONLY** adds a GTA door sound to existing doors (type the model names or read them from a `.ytyp`) — just one small audio file + the fxmanifest lines, nothing else changed. |
 | **fxmanifest** | **⧉ COPY** button: copies the exact lines to paste in your own resource's `fxmanifest.lua`. |
 | **Projects & presets** | `.doorproject` files (model embedded), built-in and custom presets. |
 

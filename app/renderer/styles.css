@@ -299,3 +299,15 @@ body.dragging .drop-overlay { display: flex; }
 #panel-ytyppreview h2 .seg.inline { margin-left: 6px; }
 #panel-ytyppreview h2 { white-space: nowrap; }
 .copy-btn { white-space: nowrap; }
+
+.btn.ghost { background: transparent; border-style: dashed; color: var(--accent2); margin-top: 6px; }
+.btn.ghost:hover { background: #a855f714; }
+.so-box { width: 560px; max-height: 92vh; overflow-y: auto; }
+.so-box h3 { display: flex; align-items: center; gap: 8px; }
+.so-intro { margin: -4px 0 6px; font-size: 12px; }
+#so-names { width: 100%; height: 92px; resize: vertical; background: var(--bg0); border: 1px solid var(--line2); border-radius: 4px; color: var(--text); font: 12px var(--mono); padding: 6px 8px; outline: none; }
+#so-names:focus { border-color: var(--accent); }
+#so-sound { width: 100%; }
+.so-file { display: flex; align-items: center; gap: 6px; }
+.so-file input { flex: 1; font-family: var(--mono); }
+.so-fx { max-height: 150px; min-height: 60px; font-size: 11px; }

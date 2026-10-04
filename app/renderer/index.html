@@ -28,6 +28,8 @@
           <button data-cmd="sample">Load sample door</button>
           <button data-cmd="sampleGarage">Load sample garage</button>
           <hr />
+          <button data-cmd="soundOnly">Sound only (door already made)…</button>
+          <hr />
           <button data-cmd="shortcut">Create desktop shortcut</button>
         </div>
       </div>
@@ -61,6 +63,7 @@
         <div id="pi-warn" class="warn hidden"></div>
       </div>
       <button id="btn-import" class="btn wide">IMPORT PROP</button>
+      <button id="btn-soundonly" class="btn wide ghost" title="Add a GTA door sound to a door you already made (no model needed)">♪ SOUND ONLY - door already made</button>
     </section>
 
     <button id="btn-create" class="btn-create" disabled>
@@ -330,6 +333,27 @@
   </section>
 
   <div id="toast" class="toast"></div>
+  <div id="so-modal" class="modal hidden">
+    <div class="modal-box so-box">
+      <h3>♪ SOUND ONLY <span class="h-tag">door already made</span></h3>
+      <p class="muted so-intro">Adds a GTA door sound to doors that are already in your resource. Nothing else is changed: no .ydr / .ytyp export.</p>
+      <label class="lbl">Door model names <span class="muted">(one per line - the archetype name used in your ytyp)</span></label>
+      <textarea id="so-names" spellcheck="false" placeholder="door_lab_byfred&#10;my_garage_door"></textarea>
+      <div class="row2"><button class="btn" id="so-fromytyp">From a .ytyp…</button><button class="btn" id="so-fromcurrent">Current door</button></div>
+      <label class="lbl">Sound</label>
+      <select id="so-sound"></select>
+      <div class="snd-info" id="so-info"></div>
+      <label class="lbl">Audio file name</label>
+      <div class="so-file"><input type="text" id="so-file" spellcheck="false" /><span class="muted">_game.dat151.rel</span></div>
+      <label class="lbl">fxmanifest.lua lines</label>
+      <pre class="code so-fx" id="so-fx"></pre>
+      <div class="modal-actions">
+        <button class="btn" id="so-close">Close</button>
+        <button class="btn" id="so-copy">⧉ COPY FXMANIFEST</button>
+        <button class="btn accent" id="so-create">CREATE AUDIO FILE</button>
+      </div>
+    </div>
+  </div>
   <div id="modal" class="modal hidden"><div class="modal-box"><h3 id="modal-title"></h3><div id="modal-body"></div><div class="modal-actions" id="modal-actions"></div></div></div>
 
   <script type="module" src="js/app.js"></script>

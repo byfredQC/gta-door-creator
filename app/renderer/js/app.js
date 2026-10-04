@@ -384,6 +384,62 @@ async function writeAudio(dir, a) {
   return { file, label: r.label };
 }
 
+// ------------------------------------------------------------------ SOUND ONLY tool (doors already made)
+const SO = { sound: '86e5cee2' };
+function soNames() {
+  return [...new Set($('so-names').value.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean).map((x) => D.sanitizeName(x)))];
+}
+function soFileBase() { return D.sanitizeName($('so-file').value || 'door_sounds'); }
+function soRefresh() {
+  const names = soNames(), file = soFileBase() + '_game.dat151.rel';
+  const set = DOOR_SOUNDS.find((x) => x.id === SO.sound);
+  $('so-info').innerHTML = set ? `♪ ${esc(set.label)}<span class="ex">like ${esc(set.examples.slice(0, 3).join(', '))}</span>` : '';
+  $('so-fx').textContent = names.length
+    ? `-- GTA Door Creator : door sound (${names.join(', ')})\nfiles {\n  'audio/${file}',\n}\ndata_file 'AUDIO_GAMEDATA' 'audio/${file.replace('.dat151.rel', '.dat')}'\n`
+    : '-- type at least one door model name';
+  $('so-create').disabled = !names.length; $('so-copy').disabled = !names.length;
+}
+function openSoundOnly() {
+  const sel = $('so-sound');
+  if (!sel.options.length) {
+    sel.innerHTML = [4, 0, 1, 2, 3].map((t) => `<optgroup label="${SOUND_TYPE_NAMES[t]}">` + DOOR_SOUNDS.filter((x) => x.type === t).map((x) => `<option value="${x.id}">${esc(x.label)}</option>`).join('') + '</optgroup>').join('');
+  }
+  if (S.model && S.door.created && !$('so-names').value.trim()) {
+    const r = resolveSound(); $('so-names').value = archetype().archetypeName;
+    if (r && DOOR_SOUNDS.some((x) => x.id === r.id)) SO.sound = r.id;
+  }
+  sel.value = SO.sound;
+  if (!$('so-file').value) $('so-file').value = soNames()[0] || 'door_sounds';
+  $('so-modal').classList.remove('hidden');
+  soRefresh();
+}
+async function soFromYtyp() {
+  const paths = await api.openPropDialog(); const p = (paths || []).find((x) => /\.ytyp$/i.test(x));
+  if (!p) { if (paths && paths.length) toast('Choose a .ytyp file', 'err'); return; }
+  try {
+    const res = await api.load(p);
+    const names = res.archetypes.map((a) => a.name).filter((n) => !n.startsWith('hash_'));
+    const unknown = res.archetypes.length - names.length;
+    const cur = $('so-names').value.trim();
+    $('so-names').value = (cur ? cur + '\n' : '') + names.join('\n');
+    if (!$('so-file').value || $('so-file').value === 'door_sounds') $('so-file').value = D.sanitizeName(res.name.startsWith('hash_') ? basename(p).replace(/\.ytyp$/i, '') : res.name);
+    toast(`${names.length} archetype(s) added${unknown ? `, ${unknown} unnamed (put the .ydr files next to the .ytyp to read their names)` : ''} - remove the ones that are not doors`, unknown ? '' : 'ok');
+    soRefresh();
+  } catch (e) { toast(e.message, 'err'); }
+}
+async function soCreate() {
+  const names = soNames(); if (!names.length) return;
+  const dir = await api.chooseFolder('Where should the audio file go? (your resource\'s audio folder)');
+  if (!dir) return;
+  const file = soFileBase() + '_game.dat151.rel';
+  try {
+    await api.buildAudio(joinPath(dir, file), names.map((n) => ({ model: n, settings: SO.sound })));
+    api.copyText($('so-fx').textContent);
+    toast(`${file} created for ${names.length} door(s) - fxmanifest lines copied (Ctrl+V)`, 'ok');
+    log(`› Sound only → ${joinPath(dir, file)} (${names.join(', ')})`, 'ok');
+  } catch (e) { toast(e.message, 'err'); }
+}
+
 // ------------------------------------------------------------------ refresh: state -> UI + viewer
 function refresh() {
   const d = S.door, has = !!S.model, created = has && d.created;
@@ -945,6 +1001,16 @@ function bind() {
     $('cb-max' + k).oninput = () => { S.door.collision.boxMax[i] = +$('cb-max' + k).value; touch(); };
   });
 
+  // sound only tool
+  $('btn-soundonly').onclick = openSoundOnly;
+  $('so-close').onclick = () => $('so-modal').classList.add('hidden');
+  $('so-names').oninput = soRefresh; $('so-file').oninput = soRefresh;
+  $('so-sound').onchange = () => { SO.sound = $('so-sound').value; soRefresh(); };
+  $('so-fromytyp').onclick = soFromYtyp;
+  $('so-fromcurrent').onclick = () => { if (!S.model || !S.door.created) { toast('No door in the editor', 'err'); return; } const n = archetype().archetypeName; if (!soNames().includes(n)) $('so-names').value = ($('so-names').value.trim() ? $('so-names').value.trim() + '\n' : '') + n; soRefresh(); };
+  $('so-copy').onclick = () => { api.copyText($('so-fx').textContent); toast('fxmanifest lines copied (Ctrl+V)', 'ok'); };
+  $('so-create').onclick = soCreate;
+
   // door sound
   $('snd-select').onchange = () => {
     const v = $('snd-select').value;
@@ -1060,6 +1126,7 @@ async function menuCmd(cmd) {
     const out = joinPath(dir, cmd === 'sample' ? 'gdc_sample_door.ydr' : 'gdc_sample_garage.ydr');
     try { await api.buildSample(out, cmd === 'sample' ? 'door' : 'garage'); await loadPaths([out]); } catch (e) { toast(e.message, 'err'); }
   }
+  else if (cmd === 'soundOnly') openSoundOnly();
   else if (cmd === 'shortcut' ) { const ok = await window.api.shortcut(); toast(ok ? 'Desktop shortcut created' : 'Could not create the shortcut', ok ? 'ok' : 'err'); }
   else if (cmd === 'shortcut:ok') toast('Desktop shortcut created', 'ok');
   else if (cmd === 'shortcut:fail') toast('Could not create the shortcut', 'err');
