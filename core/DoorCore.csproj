@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <NoWarn>$(NoWarn);CS0618;CS0169;CS0414;CS0649;CS0168;CS0219;CS8632;CS0108;CS0162;CA1416;SYSLIB0011;CS0105;CS0114;CS0109;CS1717;CS0659;CS0661;CS0660;CS0067;CS0252;CS0253;CS1998;CS0628;CS0472</NoWarn>
+    <AssemblyName>DoorCore</AssemblyName>
+    <RootNamespace>DoorCore</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="vendor/CodeWalker.Core/**/*.cs" />
+    <Compile Include="vendor/SharpDX/**/*.cs" />
+    <Compile Include="src/*.cs" />
+    <EmbeddedResource Include="vendor/CodeWalker.Core/Resources/magic.dat" />
+    <None Include="vendor/CodeWalker.Core/strings.txt" CopyToOutputDirectory="PreserveNewest" Link="strings.txt" />
+    <None Include="vendor/CodeWalker.Core/ShadersGen9Conversion.xml" CopyToOutputDirectory="PreserveNewest" Link="ShadersGen9Conversion.xml" />
+  </ItemGroup>
+</Project>

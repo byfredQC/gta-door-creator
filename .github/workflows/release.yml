@@ -1,0 +1,50 @@
+name: Build & Release
+
+on:
+  push:
+    tags: ['v*']          # git tag v1.6.0 && git push --tags  ->  GitHub Release with the installer
+  workflow_dispatch:      # or run it by hand from the Actions tab (artifacts only)
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install
+        run: npm ci
+
+      - name: Build DoorCore (self-contained, no .NET needed on the user's PC)
+        run: npm run publish:core:win
+
+      - name: Build app (installer + portable zip)
+        run: npm run dist:win
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: GTA-Door-Creator-windows
+          path: |
+            dist/*.exe
+            dist/*.zip
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+            dist/*.zip
+          generate_release_notes: true

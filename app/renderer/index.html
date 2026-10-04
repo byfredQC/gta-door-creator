@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'sha256-M/P1KeBMJDKt4usglSGT4py0Tpke6PWlEGC2zVbM/AE='" />
+  <title>GTA Door Creator</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script type="importmap">
+    { "imports": {
+      "three": "./vendor/three.module.js",
+      "three/addons/": "./vendor/addons/"
+    } }
+  </script>
+</head>
+<body>
+  <!-- ================================================================ TOP BAR -->
+  <header id="topbar">
+    <div class="brand"><span class="brand-mark"></span><span class="brand-text">GTA DOOR CREATOR</span><span class="brand-sub">FiveM · MLO</span></div>
+    <nav class="menu">
+      <div class="menu-item" id="menu-file">File
+        <div class="menu-pop">
+          <button data-cmd="new">New Project <kbd>Ctrl+N</kbd></button>
+          <button data-cmd="open">Open Project… <kbd>Ctrl+O</kbd></button>
+          <button data-cmd="save">Save Project <kbd>Ctrl+S</kbd></button>
+          <button data-cmd="saveAs">Save As… <kbd>Ctrl+Shift+S</kbd></button>
+          <hr />
+          <button data-cmd="import">Import Prop… <kbd>Ctrl+I</kbd></button>
+          <button data-cmd="sample">Load sample door</button>
+          <button data-cmd="sampleGarage">Load sample garage</button>
+          <hr />
+          <button data-cmd="shortcut">Create desktop shortcut</button>
+        </div>
+      </div>
+    </nav>
+    <ol class="steps" id="steps">
+      <li data-step="1">Import</li><li data-step="2">Create</li><li data-step="3">Type</li><li data-step="4">Configure</li>
+      <li data-step="5">Preview</li><li data-step="6">YTYP</li><li data-step="7">Export</li>
+    </ol>
+    <div class="top-right">
+      <span id="project-name" class="project-name">Untitled project</span>
+      <span id="engine-status" class="engine-status" title="DoorCore engine">● Engine…</span>
+    </div>
+  </header>
+
+  <!-- ================================================================ LEFT PANEL -->
+  <aside id="left">
+    <section class="panel" id="panel-prop">
+      <h2>PROP</h2>
+      <div id="dropzone" class="dropzone">
+        <div class="dz-icon"></div>
+        <div class="dz-title">DROP GTA PROP HERE</div>
+        <div class="dz-sub">.ydr · .ydr.xml · .ytyp · .ybn · .ytd</div>
+      </div>
+      <div id="prop-info" class="prop-info hidden">
+        <div class="kv"><span>Model</span><b id="pi-model">–</b></div>
+        <div class="kv"><span>Type</span><b id="pi-type">–</b></div>
+        <div class="kv size"><span>Size</span><b><i>X</i><em id="pi-sx">–</em><i>Y</i><em id="pi-sy">–</em><i>Z</i><em id="pi-sz">–</em></b></div>
+        <div class="kv"><span>Vertices</span><b id="pi-verts">–</b></div>
+        <div class="kv"><span>Materials</span><b id="pi-mats">–</b></div>
+        <div class="kv"><span>Collision</span><b id="pi-col">–</b></div>
+        <div id="pi-warn" class="warn hidden"></div>
+      </div>
+      <button id="btn-import" class="btn wide">IMPORT PROP</button>
+    </section>
+
+    <button id="btn-create" class="btn-create" disabled>
+      <span class="bc-title">CREATE DOOR</span><span class="bc-sub">pivot · origin · animation · YTYP</span>
+    </button>
+
+    <section class="panel locked" id="panel-detect">
+      <h2>AUTO DETECT <button class="mini" id="btn-detect">RE-RUN</button></h2>
+      <div class="detect">
+        <div class="kv"><span>Likely Door Type</span><b id="ad-type">–</b></div>
+        <div class="confidence"><div class="bar"><div id="ad-bar"></div></div><span id="ad-conf">–</span></div>
+        <div class="kv"><span>Suggested Pivot</span><b id="ad-pivot">–</b></div>
+        <div class="kv"><span>Suggested Opening</span><b id="ad-open">–</b></div>
+        <div id="ad-why" class="why"></div>
+        <button id="btn-accept" class="btn wide accent">ACCEPT SUGGESTION</button>
+      </div>
+    </section>
+
+    <section class="panel locked" id="panel-type">
+      <h2>DOOR TYPE</h2>
+      <div class="type-grid">
+        <button class="type-btn" data-type="normal"><span class="ti ti-normal"></span>NORMAL DOOR</button>
+        <button class="type-btn" data-type="sliding"><span class="ti ti-sliding"></span>SLIDING DOOR</button>
+        <button class="type-btn" data-type="garage"><span class="ti ti-garage"></span>GARAGE DOOR</button>
+      </div>
+    </section>
+
+    <section class="panel locked" id="panel-settings">
+      <h2>SETTINGS <span class="h-tag" id="settings-tag">NORMAL</span></h2>
+
+      <!-- NORMAL -->
+      <div class="type-settings" data-for="normal">
+        <label class="lbl">Direction (hinge side)</label>
+        <div class="seg big">
+          <button data-hinge="left">◧ LEFT</button>
+          <button data-hinge="right">RIGHT ◨</button>
+        </div>
+        <div class="row2">
+          <button class="btn" id="btn-flip" title="Reverse the swing direction">⇄ FLIP</button>
+          <button class="btn" id="btn-autopivot" title="Detect the hinge side and place the pivot on the edge">✦ AUTO PIVOT</button>
+        </div>
+        <div class="swing-info" id="swing-info">Opens toward −Y (push)</div>
+        <label class="lbl">Opening Angle <b id="v-angle">90°</b></label>
+        <input type="range" id="in-angle" min="0" max="180" step="1" value="90" />
+        <div class="ticks"><span>0°</span><span>45°</span><span>90°</span><span>135°</span><span>180°</span></div>
+      </div>
+
+      <!-- SLIDING -->
+      <div class="type-settings" data-for="sliding">
+        <label class="lbl">Direction</label>
+        <div class="seg big four">
+          <button data-sdir="left">← LEFT</button>
+          <button data-sdir="right">RIGHT →</button>
+          <button data-sdir="up">↑ UP</button>
+          <button data-sdir="down">↓ DOWN</button>
+        </div>
+        <label class="lbl">Slide Distance <b id="v-sdist">1.00 m</b></label>
+        <div class="seg chips" id="sdist-presets">
+          <button data-sd="0.10">0.10 m</button><button data-sd="0.25">0.25 m</button><button data-sd="0.50">0.50 m</button>
+          <button data-sd="1.00">1.00 m</button><button data-sd="auto">Door width</button><button data-sd="custom">Custom</button>
+        </div>
+        <div class="num-row" id="sdist-custom"><input type="number" id="in-sdist" step="0.01" min="0" value="1.00" /><span>m</span></div>
+      </div>
+
+      <!-- GARAGE -->
+      <div class="type-settings" data-for="garage">
+        <label class="lbl">Garage Type</label>
+        <div class="seg big three">
+          <button data-gkind="sliding">GARAGE SLIDING</button>
+          <button data-gkind="rollup">GARAGE ROLL UP</button>
+          <button data-gkind="sectional">GARAGE SECTIONAL</button>
+        </div>
+        <div class="grid2">
+          <label>Opening Height<input type="number" id="in-gheight" step="0.05" min="0" /><span class="u">m</span></label>
+          <label>Opening Distance<input type="number" id="in-gdist" step="0.05" min="0" /><span class="u">m</span></label>
+          <label class="g-sect">Panel Count<input type="number" id="in-gpanels" step="1" min="1" max="20" /></label>
+          <label class="g-sect">Panel Size<input type="number" id="in-gpsize" step="0.01" min="0.05" /><span class="u">m</span></label>
+        </div>
+        <div class="g-sect panels" id="panel-list"></div>
+        <label class="check g-sect-check"><input type="checkbox" id="in-ingame" /> Preview the in-game motion <span class="muted" id="ingame-note"></span></label>
+      </div>
+
+      <label class="lbl">Opening Speed</label>
+      <div class="seg three" id="speed-seg">
+        <button data-speed="slow">SLOW</button><button data-speed="normal">NORMAL</button><button data-speed="fast">FAST</button>
+      </div>
+
+      <label class="lbl">In-game behaviour</label>
+      <div class="seg two" id="engine-seg">
+        <button data-engine="native" title="GTA door system: pushable physics door (doortuning)">NATIVE DOOR</button>
+        <button data-engine="scripted" title="Animated by the generated Lua exactly like the preview">SCRIPTED</button>
+      </div>
+      <div class="hint" id="engine-hint"></div>
+    </section>
+
+    <section class="panel locked" id="panel-pivot">
+      <h2>PIVOT <button class="mini" id="btn-gizmo" title="Move the pivot with the 3D gizmo">GIZMO</button></h2>
+      <div class="seg five" id="pivot-seg">
+        <button data-pmode="auto">AUTO</button><button data-pmode="left">LEFT</button><button data-pmode="center">CENTER</button>
+        <button data-pmode="right">RIGHT</button><button data-pmode="custom">CUSTOM</button>
+      </div>
+      <div class="xyz">
+        <label><i class="ax x">X</i><input type="number" step="0.005" id="pv-x" /></label>
+        <label><i class="ax y">Y</i><input type="number" step="0.005" id="pv-y" /></label>
+        <label><i class="ax z">Z</i><input type="number" step="0.005" id="pv-z" /></label>
+      </div>
+      <div class="hint">Pivot = new model origin. The geometry is only offset on export; your source file is never modified.</div>
+    </section>
+
+    <section class="panel locked" id="panel-collision">
+      <h2>COLLISION</h2>
+      <div class="seg four" id="col-mode">
+        <button data-cmode="none">NO COLLISION</button><button data-cmode="auto">AUTO COLLISION</button>
+        <button data-cmode="import">IMPORT YBN</button><button data-cmode="keep" id="col-keep">KEEP EMBEDDED</button>
+      </div>
+      <div id="col-auto">
+        <div class="seg three" id="col-shape">
+          <button data-cshape="box">BOX</button><button data-cshape="convex">CONVEX</button><button data-cshape="custom">CUSTOM</button>
+        </div>
+        <div id="col-custom" class="col-custom">
+          <div class="xyz small"><span>Min</span>
+            <input type="number" step="0.01" id="cb-minx" /><input type="number" step="0.01" id="cb-miny" /><input type="number" step="0.01" id="cb-minz" />
+          </div>
+          <div class="xyz small"><span>Max</span>
+            <input type="number" step="0.01" id="cb-maxx" /><input type="number" step="0.01" id="cb-maxy" /><input type="number" step="0.01" id="cb-maxz" />
+          </div>
+        </div>
+      </div>
+      <div id="col-import" class="row2">
+        <button class="btn" id="btn-ybn">Choose .ybn…</button><span id="ybn-name" class="muted">none</span>
+      </div>
+      <label class="lbl">Material</label>
+      <select id="col-material">
+        <option value="70">WOOD_SOLID_MEDIUM</option>
+        <option value="67">METAL_GARAGE_DOOR</option>
+        <option value="112">GLASS_SHOOT_THROUGH</option>
+        <option value="116">CAR_METAL</option>
+        <option value="1">CONCRETE</option>
+      </select>
+      <div class="hint" id="col-info"></div>
+    </section>
+
+    <section class="panel locked" id="panel-sound">
+      <h2>DOOR SOUND <span class="h-tag">no script</span></h2>
+      <select id="snd-select"></select>
+      <div class="snd-info" id="snd-info"></div>
+      <div class="hint">Uses GTA's own door sounds: the export adds a small audio file (game.dat151) that links your door to the chosen sound. Heard in-game only.</div>
+    </section>
+
+    <section class="panel locked" id="panel-doorsettings">
+      <h2>DOOR SETTINGS</h2>
+      <div class="form">
+        <label>Name<input type="text" id="ds-name" spellcheck="false" /></label>
+        <label>Type<select id="ds-type"><option value="normal">Normal</option><option value="sliding">Sliding</option><option value="garage">Garage</option></select></label>
+        <label>Direction<select id="ds-dir"></select></label>
+        <label>Pivot<input type="text" id="ds-pivot" readonly /></label>
+        <label>Opening Angle<input type="number" id="ds-angle" min="0" max="180" /></label>
+        <label>Opening Distance<input type="number" id="ds-dist" step="0.01" min="0" /></label>
+        <label>Opening Speed<select id="ds-speed"><option value="slow">Slow</option><option value="normal">Normal</option><option value="fast">Fast</option></select></label>
+        <label>Collision<select id="ds-col"><option value="none">None</option><option value="auto">Auto</option><option value="import">Import YBN</option><option value="keep">Keep embedded</option></select></label>
+        <label>LOD<input type="number" id="ds-lod" step="1" min="1" /></label>
+      </div>
+      <button id="btn-apply" class="btn wide accent">APPLY</button>
+    </section>
+
+    <section class="panel" id="panel-presets">
+      <h2>PRESETS <button class="mini" id="btn-savepreset">SAVE PRESET</button></h2>
+      <div id="preset-list" class="preset-list"></div>
+    </section>
+  </aside>
+
+  <!-- ================================================================ VIEWPORT -->
+  <main id="viewport-wrap">
+    <div id="viewport"></div>
+    <div class="vp-toolbar left">
+      <div class="seg tight" id="view-seg">
+        <button data-view="persp" title="Perspective (5)">PERSP</button>
+        <button data-view="front" title="Front (1)">FRONT</button>
+        <button data-view="side" title="Side (3)">SIDE</button>
+        <button data-view="top" title="Top (7)">TOP</button>
+      </div>
+      <button class="tool" id="btn-frame" title="Frame model (F)">⤢</button>
+    </div>
+    <div class="vp-toolbar right">
+      <div class="seg tight" id="shade-seg">
+        <button data-shade="wire" title="Wireframe (Z)">WIREFRAME</button>
+        <button data-shade="solid" title="Solid">SOLID</button>
+        <button data-shade="material" title="Material preview">MATERIAL</button>
+      </div>
+      <button class="tool toggle on" id="btn-grid" title="Grid (G)">GRID</button>
+      <button class="tool toggle on" id="btn-colvis" title="Show collision (C)">COLL</button>
+      <button class="tool toggle on" id="btn-ghost" title="Show closed position ghost">GHOST</button>
+    </div>
+    <div class="vp-hud" id="vp-hud"></div>
+    <div class="vp-axes" id="vp-axes"></div>
+    <div class="vp-help">LMB orbit · RMB / Shift pan · Wheel zoom · F frame · 1/3/7/5 views</div>
+    <div class="vp-empty" id="vp-empty">
+      <div class="vp-empty-box">
+        <div class="dz-icon big"></div>
+        <div class="dz-title">DROP GTA PROP HERE</div>
+        <div class="dz-sub">Drag a .ydr anywhere into the window</div>
+        <div class="flow">IMPORT PROP → CREATE DOOR → CHOOSE TYPE → LEFT/RIGHT → PREVIEW → GENERATE YTYP → EXPORT</div>
+      </div>
+    </div>
+    <div class="drop-overlay" id="drop-overlay"><div>Release to import</div></div>
+  </main>
+
+  <!-- ================================================================ DOOR PREVIEW -->
+  <section id="preview">
+    <h2>DOOR PREVIEW</h2>
+    <div class="transport">
+      <button id="pv-play" title="Play (Space)">▶</button>
+      <button id="pv-pause" title="Pause">⏸</button>
+      <button id="pv-stop" title="Stop">⏹</button>
+      <button id="pv-reset" title="Reset">↻</button>
+    </div>
+    <div class="scrub">
+      <span class="lab">CLOSED</span>
+      <input type="range" id="pv-slider" min="0" max="1000" value="0" />
+      <span class="lab">OPEN</span>
+      <span class="pct" id="pv-pct">0%</span>
+    </div>
+    <button id="pv-loop" class="tool toggle">LOOP</button>
+    <div class="pv-readout" id="pv-readout">–</div>
+  </section>
+
+  <!-- ================================================================ BOTTOM: YTYP / PREVIEW / EXPORT -->
+  <section id="bottom">
+    <div class="panel" id="panel-ytyp">
+      <h2>YTYP <span class="h-tag" id="ytyp-state">not generated</span></h2>
+      <div class="form two">
+        <label>Archetype Name<input type="text" id="y-arch" spellcheck="false" /></label>
+        <label>Model Name<input type="text" id="y-model" spellcheck="false" /></label>
+        <label>YTYP File<input type="text" id="y-file" spellcheck="false" /></label>
+        <label>Type<input type="text" id="y-type" readonly /></label>
+        <label>Bounds<input type="text" id="y-bounds" readonly /></label>
+        <label>Center<input type="text" id="y-center" readonly /></label>
+        <label>Radius<input type="text" id="y-radius" readonly /></label>
+        <label>LOD Distance<input type="number" id="y-lod" step="1" min="1" /></label>
+        <label>HD LOD Distance<input type="number" id="y-hd" step="1" min="0" /></label>
+        <label>Texture Dict<input type="text" id="y-txd" spellcheck="false" /></label>
+        <label class="span2">Flags<input type="number" id="y-flags" min="0" /><button class="mini" id="y-flags-auto" title="Use recommended flags for this door">AUTO</button></label>
+      </div>
+      <div class="flag-chips" id="y-flagchips"></div>
+      <button id="btn-genytyp" class="btn wide accent">GENERATE YTYP</button>
+    </div>
+
+    <div class="panel" id="panel-ytyppreview">
+      <h2>YTYP PREVIEW <button class="mini copy-btn" id="btn-copy-fx" title="Copy the lines to paste in your fxmanifest.lua">⧉ COPY</button><span class="seg tight inline" id="yp-mode"><button data-yp="text" class="on">SUMMARY</button><button data-yp="xml">XML</button><button data-yp="fx">FXMANIFEST</button></span></h2>
+      <pre id="ytyp-preview" class="code"></pre>
+    </div>
+
+    <div class="panel" id="panel-export">
+      <h2>EXPORT</h2>
+      <div class="out-folder"><span id="out-folder" class="muted">No output folder</span><button class="mini" id="btn-outfolder">CHOOSE…</button></div>
+      <div class="exp-grid">
+        <button class="btn" id="ex-ydr">EXPORT YDR</button>
+        <button class="btn" id="ex-ytyp">EXPORT YTYP</button>
+        <button class="btn" id="ex-ybn">EXPORT YBN</button>
+        <button class="btn accent" id="ex-all">EXPORT ALL</button>
+      </div>
+      <button class="btn-fivem" id="ex-fivem"><span>EXPORT FIVEM RESOURCE</span><small id="fivem-tree">my_door/ stream/ · fxmanifest.lua</small></button>
+      <label class="check"><input type="checkbox" id="ex-script" checked /> Include Lua script <span class="muted">(off = native GTA door, no script)</span></label>
+      <label class="check"><input type="checkbox" id="ex-streamybn" /> Also stream the standalone .ybn <span class="muted">(see note)</span></label>
+      <div id="export-log" class="export-log"></div>
+    </div>
+  </section>
+
+  <div id="toast" class="toast"></div>
+  <div id="modal" class="modal hidden"><div class="modal-box"><h3 id="modal-title"></h3><div id="modal-body"></div><div class="modal-actions" id="modal-actions"></div></div></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+{
+  "name": "gta-door-creator",
+  "productName": "GTA Door Creator",
+  "version": "1.6.0",
+  "description": "Standalone GTA V / FiveM door creator: drop a prop, make it a door, export a ready FiveM resource (YDR + YTYP + collision + door sound).",
+  "main": "app/main.js",
+  "author": "Fred",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build:core": "dotnet build core/DoorCore.csproj -c Release -o core/bin/out",
+    "publish:core:win": "dotnet publish core/DoorCore.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -o core/bin/out",
+    "dist:win": "electron-builder --win --x64 --publish never",
+    "release:win": "npm run publish:core:win && npm run dist:win"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "three": "0.170.0"
+  },
+  "build": {
+    "appId": "com.fred.gtadoorcreator",
+    "productName": "GTA Door Creator",
+    "copyright": "MIT",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "app/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "core/bin/out",
+        "to": "core",
+        "filter": [
+          "**/*",
+          "!*.pdb",
+          "!DoorCore"
+        ]
+      },
+      {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": true
+    },
+    "fileAssociations": [
+      {
+        "ext": "doorproject",
+        "name": "GTA Door Project",
+        "description": "GTA Door Creator project"
+      }
+    ],
+    "asar": true,
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "GTA Door Creator",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "GTA-Door-Creator-Setup-${version}.${ext}"
+    },
+    "artifactName": "GTA-Door-Creator-${version}-${os}-${arch}.${ext}"
+  },
+  "homepage": "https://github.com/YOUR_GITHUB_NAME/gta-door-creator",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_GITHUB_NAME/gta-door-creator.git"
+  },
+  "keywords": [
+    "gta5",
+    "fivem",
+    "door",
+    "ytyp",
+    "ydr",
+    "codewalker",
+    "mlo",
+    "mapping"
+  ]
+}

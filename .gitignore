@@ -1,0 +1,7 @@
+node_modules/
+dist/
+core/bin/
+core/obj/
+*.pdb
+.DS_Store
+Thumbs.db

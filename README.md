@@ -1,0 +1,135 @@
+<div align="center">
+
+<img src="build/icon.png" width="96" alt="" />
+
+# GTA Door Creator
+
+**Turn any GTA V prop into a working FiveM door — in a few clicks, no Blender.**
+
+`IMPORT PROP → CREATE DOOR → CHOOSE TYPE → LEFT / RIGHT → PREVIEW → GENERATE YTYP → EXPORT`
+
+[⬇ Download (Windows)](../../releases/latest) · [Features](#features) · [How to use](#how-to-use) · [Build](#build-from-source)
+
+</div>
+
+![GTA Door Creator](docs/screenshot-normal.png)
+
+## Download & install (plug and play)
+
+1. Go to **[Releases](../../releases/latest)** and download **`GTA-Door-Creator-Setup-x.y.z.exe`**.
+2. Run it — the app installs, puts a shortcut on your desktop and opens.
+   *(Portable version: download the `.zip`, unzip, run `GTA Door Creator.exe`.)*
+
+Nothing else to install: the release build includes everything (no .NET, no Blender, no CodeWalker needed).
+
+> Windows SmartScreen may say *"Windows protected your PC"* because the app is not code-signed:
+> click **More info → Run anyway**.
+
+## Features
+
+| | |
+|---|---|
+| **Import** | Drag & drop `.ydr`, CodeWalker `.ydr.xml`, `.ytyp` (reads LOD / flags / texture dictionary), `.ybn` (collision), `.ytd` (texture preview). |
+| **3D viewport** | Orbit / pan / zoom, Perspective · Front · Side · Top, Grid, Wireframe · Solid · Material preview. |
+| **Auto detect** | Guesses the door type and the hinge side (handle position, `_l`/`_r` suffix, models that are already pivoted like vanilla doors). |
+| **Door types** | **Normal** (left/right, flip, 0–180°), **Sliding** (← → ↑ ↓, distance), **Garage** (lift, roll-up, sectional with N panels). |
+| **Pivot editor** | AUTO / LEFT / CENTER / RIGHT / CUSTOM, X Y Z fields and a 3D gizmo. The pivot becomes the model origin on export; your source file is never modified. |
+| **Preview** | ▶ ⏸ ⏹ ↻, CLOSED → OPEN slider, loop. |
+| **Collision** | Embedded **inside the `.ydr`** (it moves with the door): auto box, convex hull, custom box, imported `.ybn`, or keep the model's own. |
+| **Door sound** | Uses GTA's own door sounds — **no script**. 47 sounds from the game (wood, glass shop, fire door, jail bars, garage, roller shutter, prison gate…). Vanilla models keep their original sound automatically. |
+| **YTYP** | Live archetype preview (summary / XML), flags, LOD, HD LOD, texture dictionary. |
+| **Export** | `EXPORT YDR / YTYP / YBN / ALL` and **EXPORT FIVEM RESOURCE**. |
+| **fxmanifest** | **⧉ COPY** button: copies the exact lines to paste in your own resource's `fxmanifest.lua`. |
+| **Projects & presets** | `.doorproject` files (model embedded), built-in and custom presets. |
+
+<p align="center">
+  <img src="docs/screenshot-garage.png" width="49%" alt="Sectional garage preview" />
+  <img src="docs/screenshot-sound-fx.png" width="49%" alt="Door sound and fxmanifest lines" />
+</p>
+
+## How to use
+
+1. **Drop your prop** (`.ydr` or `.ydr.xml`) into the window.
+2. Click **CREATE DOOR** — pivot, archetype and collision are prepared automatically.
+3. Check the **door type** and **LEFT / RIGHT** (or accept the auto-detect suggestion).
+4. **Preview** it with ▶.
+5. Pick a **door sound** (AUTO is fine).
+6. **EXPORT FIVEM RESOURCE** → copy the folder into your server's `resources/` and add `ensure <name>` to `server.cfg`.
+7. Place the model in your ymap / MLO with CodeWalker.
+
+### What you get (default: native door, no script)
+
+```
+my_door/
+├── stream/
+│   ├── my_door.ydr              model, origin = pivot, collision embedded
+│   └── my_door.ytyp             door archetype (Dynamic + Enable Door Physics)
+├── audio/
+│   └── my_door_game.dat151.rel  links the door to a GTA door sound
+└── fxmanifest.lua
+```
+
+The GTA door system moves the door by itself: hinged doors are pushed open by players, sliding doors and shutters use the game's door logic.
+
+Want the exact motion of the preview (custom angle, distance, speed, E to open, synced for all players)?
+Pick **SCRIPTED** (or tick *Include Lua script*): the export then adds `config.lua`, `client.lua` and `server.lua`.
+
+### Adding a door to your own resource
+
+Use **EXPORT ALL**, put the `.ydr`/`.ytyp` in `stream/` and the `.dat151.rel` in `audio/`, then click **⧉ COPY** in *YTYP PREVIEW → FXMANIFEST* and paste in your `fxmanifest.lua`:
+
+```lua
+files {
+  'audio/my_door_game.dat151.rel',
+}
+data_file 'DLC_ITYP_REQUEST' 'stream/my_door.ytyp'
+data_file 'AUDIO_GAMEDATA' 'audio/my_door_game.dat'
+```
+
+### Tips
+
+- A model with a vanilla name (`v_ilev_*`, `prop_*`…) replaces the original everywhere in the game — rename it in **DOOR SETTINGS**.
+- CodeWalker XML: keep the exported texture folder next to the `.ydr.xml` to embed the textures.
+- Shortcuts: `Space` play · `F` frame · `1` `3` `7` `5` views · `G` grid · `C` collision · `Z` shading · `Ctrl+S/O/N/I`.
+
+## Build from source
+
+Requirements: **Node.js 20+** and the **.NET 8 SDK** (Windows).
+
+```bat
+npm ci
+npm run publish:core:win   :: self-contained DoorCore engine
+npm run dist:win           :: dist\GTA-Door-Creator-Setup-x.y.z.exe + portable zip
+```
+
+or just run `build-windows.bat`. Dev mode: `npm run build:core` then `npm start`.
+
+### Publishing a release
+
+The GitHub Action in `.github/workflows/release.yml` builds everything on Windows and attaches the installer + zip to a Release when you push a tag:
+
+```bash
+git tag v1.6.0
+git push origin v1.6.0
+```
+
+### Project layout
+
+```
+app/                  Electron app (main process + renderer, three.js viewer)
+  renderer/js/        app.js (UI), door.js (door logic), viewer.js (3D), fivem.js (resource),
+                      doorsounds.js (GTA door sound catalog), presets.js
+core/                 DoorCore: .NET 8 engine built on CodeWalker.Core (YDR / YTYP / YBN / audio)
+  src/                Loader, Exporter, Audio, TestBuilder
+  vendor/             CodeWalker.Core + SharpDX.Mathematics sources (MIT)
+build/                icons
+.github/workflows/    Windows build & release
+```
+
+`DoorCore.exe load <file>` and `DoorCore.exe export <job.json>` also work from the command line.
+
+## Credits & license
+
+MIT © Fred — see [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Built on [CodeWalker](https://github.com/dexyfex/CodeWalker) by dexyfex and [three.js](https://threejs.org).
+Not affiliated with Rockstar Games or Cfx.re.
