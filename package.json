@@ -85,10 +85,10 @@
     },
     "artifactName": "GTA-Door-Creator-${version}-${os}-${arch}.${ext}"
   },
-  "homepage": "https://github.com/YOUR_GITHUB_NAME/gta-door-creator",
+  "homepage": "https://github.com/byfred/gta-door-creator",
   "repository": {
     "type": "git",
-    "url": "https://github.com/YOUR_GITHUB_NAME/gta-door-creator.git"
+    "url": "https://github.com/byfred/gta-door-creator.git"
   },
   "keywords": [
     "gta5",
