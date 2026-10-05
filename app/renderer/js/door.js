@@ -11,7 +11,7 @@ export const SPEEDS = {
 export const FLAG_DEFS = [
   { bit: 17, name: 'Dynamic' },
   { bit: 26, name: 'Enable Door Physics' },
-  { bit: 6, name: 'Static' },
+  { bit: 5, name: 'Static' },
   { bit: 13, name: "Don't Cast Shadows" },
   { bit: 22, name: 'No AI Cover' },
   { bit: 23, name: 'No Player Cover' },
@@ -19,6 +19,8 @@ export const FLAG_DEFS = [
   { bit: 2, name: "Don't Fade" },
   { bit: 8, name: 'Tough For Bullets' },
   { bit: 9, name: 'Has Anim (YCD)' },
+  { bit: 19, name: 'Auto Start Anim' },
+  { bit: 29, name: 'Use Ambient Scale' },
 ];
 export const FLAG_DYNAMIC = 1 << 17;          // 131072
 export const FLAG_DOOR_PHYSICS = 1 << 26;      // 67108864
@@ -277,9 +279,13 @@ export function panelLayout(door, an) {
 }
 
 // ---------------------------------------------------------------- archetype helpers
+export const FLAGS_ANIM_FRAGMENT = 537526816; // vanilla animated fragment (Dynamic + Auto Start Anim + Use Ambient Scale) + Static
 export function recommendedFlags(door) {
+  if (door.engine === 'ycd') return FLAGS_ANIM_FRAGMENT;
   return door.engine === 'native' ? (FLAG_DYNAMIC | FLAG_DOOR_PHYSICS) : FLAG_DYNAMIC;
 }
+export const isAnim = (door) => door.engine === 'ycd';
+export const animNames = (model) => ({ dict: model + '_anim', open: model + '_open', close: model + '_close' });
 export function specialAttribute(door) {
   if (door.engine !== 'native') return SPECIAL_ATTR.none;
   if (door.type === 'normal') return SPECIAL_ATTR.normal;

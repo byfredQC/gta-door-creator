@@ -181,8 +181,9 @@ function archetype() {
     lodDist: Number(y.lodDist), hdTextureDist: Number(y.hdTextureDist),
     flags: y.flagsAuto ? D.recommendedFlags(d) : Number(y.flags),
     specialAttribute: sa,
-    textureDictionary: y.textureDictionary ?? (S.model.hasEmbeddedTextures ? D.sanitizeName(y.modelName || d.name) : ''),
+    textureDictionary: D.isAnim(d) ? '' : (y.textureDictionary ?? (S.model.hasEmbeddedTextures ? D.sanitizeName(y.modelName || d.name) : '')),
     bounds: b,
+    anim: D.isAnim(d) ? D.animNames(D.sanitizeName(y.modelName || d.name)) : null,
   };
 }
 
@@ -519,6 +520,7 @@ function refresh() {
 }
 
 function engineHint(d) {
+  if (d.engine === 'ycd') return 'ANIMATED .YCD: the export makes a GTA animated fragment (.yft) + its open/close clips (.ycd) + an expression (.yed) so the COLLISION FOLLOWS the animation. A small Lua plays the clips with E, synced for every player. No GTA door sound in this mode.';
   if (d.engine === 'scripted') return 'SCRIPTED: the export adds client/server Lua that plays exactly this preview (angle, distance, speed), synced for every player (E in-game).';
   if (d.type === 'normal') return 'NATIVE (default, no script): GTA door system - a physics door players push open. Collision is embedded in the .ydr. Angle & speed only apply in SCRIPTED mode.';
   if (d.type === 'sliding') return `GTA ${D.specialAttribute(d) === 10 ? 'vertical ' : ''}sliding door: opens by itself when peds approach. Distance & speed are decided by the game - use SCRIPTED for exact values.`;
@@ -587,12 +589,21 @@ function ytypXml(a) {
    <hdTextureDist value="${f(a.hdTextureDist)}" />
    <name>${a.archetypeName}</name>
    ${a.textureDictionary ? `<textureDictionary>${a.textureDictionary}</textureDictionary>` : '<textureDictionary />'}
-   <clipDictionary />
+   ${a.anim ? `<clipDictionary>${a.anim.dict}</clipDictionary>` : '<clipDictionary />'}
    <drawableDictionary />
    <physicsDictionary>${a.archetypeName}</physicsDictionary>
-   <assetType>ASSET_TYPE_DRAWABLE</assetType>
+   <assetType>${a.anim ? 'ASSET_TYPE_FRAGMENT' : 'ASSET_TYPE_DRAWABLE'}</assetType>
    <assetName>${a.modelName}</assetName>
-   <extensions />
+   ${a.anim ? `<extensions>
+    <Item type="CExtensionDefExpression">
+     <name>${a.modelName}</name>
+     <offsetPosition x="0" y="0" z="0" />
+     <expressionDictionaryName>${a.modelName}</expressionDictionaryName>
+     <expressionName>${a.modelName}</expressionName>
+     <creatureMetadataName />
+     <initialiseOnCollision value="false" />
+    </Item>
+   </extensions>` : '<extensions />'}
   </Item>
  </archetypes>
  <name>${a.ytypName}</name>
@@ -606,7 +617,12 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 // lines to paste in an existing resource's fxmanifest.lua (files from EXPORT ALL: .ydr/.ytyp in stream/, sound in audio/)
 function fxmanifestLines() {
   if (!S.model || !S.door.created) return '';
-  const a = archetype(), snd = resolveSound();
+  const a = archetype();
+  if (a.anim) {
+    return `-- GTA Door Creator : ${a.archetypeName} (animated .ycd)\n-- stream/${a.modelName}.yft + ${a.anim.dict}.ycd + ${a.modelName}.yed + ${a.ytypName}.ytyp\n` +
+      `data_file 'DLC_ITYP_REQUEST' 'stream/${a.ytypName}.ytyp'\n-- + the client.lua / server.lua from EXPORT FIVEM RESOURCE (plays ${a.anim.open} / ${a.anim.close})\n`;
+  }
+  const snd = resolveSound();
   const audio = snd ? `${a.modelName}_game.dat151.rel` : null;
   let t = `-- GTA Door Creator : ${a.archetypeName}\n`;
   t += `-- stream/${a.modelName}.ydr + stream/${a.ytypName}.ytyp${audio ? ` + audio/${audio}` : ''}\n`;
@@ -629,7 +645,7 @@ function refreshYtyp() {
   const a = archetype(), d = S.door, y = d.ytyp;
   const setVal = (id, v) => { if (document.activeElement !== $(id)) $(id).value = v; };
   setVal('y-arch', a.archetypeName); setVal('y-model', a.modelName); setVal('y-file', a.ytypName + '.ytyp');
-  $('y-type').value = `Door · ${D.SPECIAL_ATTR_NAMES[a.specialAttribute]} (${a.specialAttribute})`;
+  $('y-type').value = a.anim ? 'Animated fragment (.ycd)' : `Door · ${D.SPECIAL_ATTR_NAMES[a.specialAttribute]} (${a.specialAttribute})`;
   const b = a.bounds;
   $('y-bounds').value = `${D.fmt(b.max[0] - b.min[0], 2)} × ${D.fmt(b.max[1] - b.min[1], 2)} × ${D.fmt(b.max[2] - b.min[2], 2)}`;
   $('y-center').value = `${D.fmt(b.center[0])}, ${D.fmt(b.center[1])}, ${D.fmt(b.center[2])}`;
@@ -654,9 +670,11 @@ function refreshYtyp() {
 ${K('Name:')}
    ${V(a.archetypeName)}
 ${K('Model:')}
-   ${V(a.modelName)}.ydr
+   ${V(a.modelName)}${a.anim ? '.yft' : '.ydr'}
 ${K('Type:')}
-   ${V('Door')} <span class="h">· specialAttribute ${a.specialAttribute} (${D.SPECIAL_ATTR_NAMES[a.specialAttribute]})</span>
+   ${a.anim ? `${V('Animated fragment')} <span class="h">· ASSET_TYPE_FRAGMENT · expression ${esc(a.modelName)}</span>
+${K('Clips:')}
+   ${V(a.anim.dict)}.ycd <span class="h">→ ${esc(a.anim.open)} / ${esc(a.anim.close)}</span>` : `${V('Door')} <span class="h">· specialAttribute ${a.specialAttribute} (${D.SPECIAL_ATTR_NAMES[a.specialAttribute]})</span>`}
 ${K('Bounds:')}  <span class="h">min → max</span>
    X: ${V(D.fmt(b.min[0]))} → ${V(D.fmt(b.max[0]))}
    Y: ${V(D.fmt(b.min[1]))} → ${V(D.fmt(b.max[1]))}
@@ -676,7 +694,7 @@ ${K('Texture Dict:')}
 ${K('Physics Dict:')}
    ${V(a.archetypeName)}
 ${K('Sound:')}
-   ${V((resolveSound() || { label: 'none' }).label)}
+   ${V(a.anim ? 'none (animated fragment)' : (resolveSound() || { label: 'none' }).label)}
 <span class="h">----------------</span>
 <span class="t">MOTION</span> <span class="h">(pivot space, used by preview + Lua)</span>
    ${K('kind')} ${V(ms.kind)}  ${K('angle')} ${V(ms.angle.toFixed(1) + '°')}  ${K('offset')} ${V(ms.offset.map((x) => x.toFixed(2)).join(', '))}`;
@@ -692,6 +710,12 @@ function refreshExport() {
   const a = S.model && d.created ? archetype() : null;
   const n = a ? a.modelName : 'my_door';
   const col = d.collision.mode !== 'none';
+  if (D.isAnim(d)) {
+    $('fivem-tree').textContent = `${n}/ stream/{${n}.yft, ${n}_anim.ycd, ${n}.yed, ${a ? a.ytypName : n}.ytyp} · fxmanifest.lua · client/server.lua`;
+    $('ex-ydr').textContent = 'EXPORT YFT+YCD'; $('ex-ybn').disabled = true;
+    return;
+  }
+  $('ex-ydr').textContent = 'EXPORT YDR';
   $('fivem-tree').textContent = `${n}/ stream/{${n}.ydr, ${a ? a.ytypName : n}.ytyp${col && d.export.streamYbn ? `, ${n}.ybn` : ''}} · fxmanifest.lua${d.export.withScript === true ? ' · client/server.lua' : ' · no script'}`;
   $('ex-ybn').disabled = !col;
 }
@@ -714,6 +738,10 @@ function exportJob(outDir, outputs) {
       ytypName: a.ytypName, archetypeName: a.archetypeName, assetName: a.modelName, lodDist: a.lodDist, hdTextureDist: a.hdTextureDist,
       flags: a.flags, specialAttribute: a.specialAttribute, textureDictionary: a.textureDictionary, physicsDictionary: a.archetypeName,
     },
+    anim: a.anim ? (() => {
+      const ms = D.motionSpec(S.door, S.an, pivot());
+      return { kind: ms.kind, axis: ms.axis, angle: ms.angle, center: ms.center, offset: ms.offset, duration: D.duration(S.door), dict: a.anim.dict };
+    })() : undefined,
   };
 }
 
@@ -724,7 +752,9 @@ async function doExport(outputs, label) {
     log(`› ${label}…`);
     const res = await api.exportFiles(exportJob(dir, outputs));
     for (const f of res.files) log(`  ✓ ${f}`, 'ok');
-    if (outputs.ydr && outputs.ytyp) {
+    if (outputs.ydr && outputs.ytyp && D.isAnim(S.door)) {
+      log('  ⧉ Put these 4 files in stream/ and use EXPORT FIVEM RESOURCE for the Lua that plays the clips', 'w');
+    } else if (outputs.ydr && outputs.ytyp) {
       const a = archetype();
       const audio = await writeAudio(dir, a);
       if (audio) log(`  ✓ ${joinPath(dir, audio.file)}  (sound: ${audio.label}) → put it in your resource's audio/ folder`, 'ok');
@@ -752,7 +782,8 @@ async function exportFiveM() {
       [{ label: 'Cancel', value: false }, { label: 'Overwrite', value: true, accent: true }]);
     if (!r) return;
   }
-  const withScript = S.door.export.withScript === true;
+  const anim = D.isAnim(S.door);
+  const withScript = anim || S.door.export.withScript === true;
   if (!withScript && S.door.engine !== 'native') {
     S.door.engine = 'native'; refresh();
     toast('No-script resource: switched to NATIVE DOOR (the GTA door system moves it)', 'ok');
@@ -772,10 +803,11 @@ async function exportFiveM() {
         log(`  ✓ collision/${b}  (not streamed - collision is embedded in the .ydr)`, 'ok');
       } else { streamFiles.push(b); log(`  ✓ stream/${b}`, 'ok'); }
     }
-    if (S.door.collision.mode !== 'none') log('  ✓ collision embedded in ' + a.modelName + '.ydr', 'ok');
-    const audio = await writeAudio(joinPath(root, 'audio'), a);
+    if (anim) log('  ✓ collision follows the animation (fragment + expression)', 'ok');
+    else if (S.door.collision.mode !== 'none') log('  ✓ collision embedded in ' + a.modelName + '.ydr', 'ok');
+    const audio = anim ? null : await writeAudio(joinPath(root, 'audio'), a);
     if (audio) log(`  ✓ audio/${audio.file}  (sound: ${audio.label})`, 'ok');
-    const files = buildResource({ door: S.door, an: S.an, pivot: pivot(), resourceName: resName, ytypFile: a.ytypName + '.ytyp', streamFiles, withScript, audioFile: audio && audio.file, soundLabel: audio && audio.label });
+    const files = buildResource({ door: S.door, an: S.an, pivot: pivot(), resourceName: resName, ytypFile: a.ytypName + '.ytyp', streamFiles, withScript, anim: a.anim, modelName: a.modelName, audioFile: audio && audio.file, soundLabel: audio && audio.label });
     for (const [fname, text] of Object.entries(files)) { await api.writeText(joinPath(root, fname), text); log(`  ✓ ${fname}`, 'ok'); }
     for (const w of res.warnings || []) log(`  ! ${w}`, 'w');
     S.ytypGenerated = true; S.exported = true; refreshYtyp(); refreshSteps();
@@ -810,7 +842,7 @@ function applyPreset(p) {
   if (!S.door.created) createDoor(false);
   const d = S.door, c = p.config;
   setType(c.type);
-  if (c.engine) { d.engine = c.engine; d.export.withScript = c.engine === 'scripted'; }
+  if (c.engine) { d.engine = c.engine; d.export.withScript = c.engine !== 'native'; }
   if (c.speed) d.speed = c.speed;
   if (c.normal) Object.assign(d.normal, c.normal);
   if (c.sliding) Object.assign(d.sliding, c.sliding);
@@ -890,7 +922,7 @@ async function openProject(path) {
     const door = Object.assign(D.defaultDoor(), proj.door);
     for (const k of ['normal', 'sliding', 'garage', 'pivot', 'collision', 'sound', 'ytyp', 'export']) door[k] = Object.assign(D.defaultDoor()[k], proj.door[k] || {});
     if (S.ybn) door.collision.ybnPath = S.ybn.path;
-    if (proj.door.export && proj.door.export.withScript === undefined) door.export.withScript = proj.door.engine === 'scripted';
+    if (proj.door.export && proj.door.export.withScript === undefined) door.export.withScript = proj.door.engine !== 'native';
     S.ytypGenerated = !!proj.state?.ytypGenerated; S.exported = !!proj.state?.exported; S.configured = !!proj.state?.configured;
     S.preview = { t: 0, playing: false, dir: 1, loop: !!proj.preview?.loop, played: false };
     await onYdr(res, door);
@@ -965,7 +997,7 @@ function bind() {
   $('in-ingame').onchange = () => { S.door.garage.previewInGame = $('in-ingame').checked; touch(); };
 
   $$('[data-speed]').forEach((b) => b.onclick = () => { S.door.speed = b.dataset.speed; touch(); });
-  $$('[data-engine]').forEach((b) => b.onclick = () => { S.door.engine = b.dataset.engine; S.door.export.withScript = b.dataset.engine === 'scripted'; touch(); });
+  $$('[data-engine]').forEach((b) => b.onclick = () => { S.door.engine = b.dataset.engine; S.door.export.withScript = b.dataset.engine !== 'native'; touch(); });
 
   // pivot
   $$('[data-pmode]').forEach((b) => b.onclick = () => {
@@ -1066,7 +1098,7 @@ function bind() {
   $('ex-ybn').onclick = () => doExport({ ydr: false, ytyp: false, ybn: true }, 'Export YBN');
   $('ex-all').onclick = () => doExport({ ydr: true, ytyp: true, ybn: !!S.door.export.streamYbn && S.door.collision.mode !== 'none' }, 'Export all (collision embedded in the .ydr)');
   $('ex-fivem').onclick = exportFiveM;
-  $('ex-script').onchange = () => { S.door.export.withScript = $('ex-script').checked; S.door.engine = S.door.export.withScript ? 'scripted' : 'native'; touch(); };
+  $('ex-script').onchange = () => { S.door.export.withScript = $('ex-script').checked; S.door.engine = S.door.export.withScript ? (S.door.engine === 'ycd' ? 'ycd' : 'scripted') : 'native'; touch(); };
   $('ex-streamybn').onchange = async () => {
     if ($('ex-streamybn').checked) {
       const ok = await modal('Stream the .ybn?', `<p>The door's collision is already <b>embedded in the .ydr</b> - that is what makes it solid and lets it move.</p>

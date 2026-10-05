@@ -18,6 +18,7 @@ namespace DoorCore
 
         public static JsonNode Export(JsonObject req)
         {
+            if (req["anim"] is JsonObject) return Animated.Export(req);
             var src = (string)req["source"];
             var outDir = (string)req["outDir"];
             var name = San((string)req["name"] ?? Path.GetFileNameWithoutExtension(src));
@@ -92,7 +93,7 @@ namespace DoorCore
             return new JsonObject { ["files"] = files, ["archetype"] = info, ["warnings"] = warnings };
         }
 
-        static string San(string s)
+        internal static string San(string s)
         {
             s = (s ?? "door").Trim().ToLowerInvariant();
             var sb = new StringBuilder();
@@ -136,7 +137,7 @@ namespace DoorCore
         }
 
         // ------------------------------------------------------------------ collision
-        static Bounds BuildCollision(JsonObject col, Drawable d, Vector3 pivot, JsonArray warnings)
+        internal static Bounds BuildCollision(JsonObject col, Drawable d, Vector3 pivot, JsonArray warnings)
         {
             var mode = ((string)col["mode"] ?? "auto").ToLowerInvariant();
             int mat = (int?)col["material"] ?? 70; // WOOD_SOLID_MEDIUM
