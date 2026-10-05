@@ -64,6 +64,11 @@ viewer.onFrame = (dt) => {
   const p = S.preview;
   if (p.playing && S.door.created) {
     const dur = D.duration(S.door);
+    if (S.door.type === 'custom') {   // custom animations play forward and wrap, like in-game
+      p.t += dt / dur;
+      if (p.t >= 1) { if (p.loop) p.t %= 1; else { p.t = 1; p.playing = false; } }
+      applyPreview(); return;
+    }
     p.t += p.dir * dt / dur;
     if (p.t >= 1) { p.t = 1; if (p.loop) p.dir = -1; else { p.playing = false; } }
     if (p.t <= 0) { p.t = 0; if (p.loop) p.dir = 1; else { p.playing = false; } }
@@ -82,6 +87,11 @@ function applyPreview() {
 function updateReadout() {
   const d = S.door, an = S.an;
   if (!S.model || !d.created) { $('pv-readout').textContent = '–'; return; }
+  if (d.type === 'custom') {
+    const dur = D.customDuration(d), pose = D.customPose(d, S.preview.t * dur);
+    $('pv-readout').textContent = `${(S.preview.t * dur).toFixed(2)} / ${dur.toFixed(2)} s · rot ${pose.r.map((v) => v.toFixed(0)).join(' ')}° · loop`;
+    return;
+  }
   const e = D.ease(S.preview.t);
   const ms = D.motionSpec(d, an, pivot());
   let txt = '';
@@ -183,7 +193,9 @@ function archetype() {
     specialAttribute: sa,
     textureDictionary: D.isAnim(d) ? '' : (y.textureDictionary ?? (S.model.hasEmbeddedTextures ? D.sanitizeName(y.modelName || d.name) : '')),
     bounds: b,
-    anim: D.isAnim(d) ? D.animNames(D.sanitizeName(y.modelName || d.name)) : null,
+    anim: !D.isAnim(d) ? null : d.type === 'custom'
+      ? { dict: D.sanitizeName(y.modelName || d.name) + '_anim', clip: D.sanitizeName(y.archetypeName || d.name), auto: true }
+      : D.animNames(D.sanitizeName(y.modelName || d.name)),
   };
 }
 
@@ -316,7 +328,7 @@ function createDoor(announce = true) {
 
 function setType(type) {
   const d = S.door;
-  if (d.type !== type) d.engine = D.defaultEngine(type);
+  if (d.type !== type) { d.engine = D.defaultEngine(type); d.export.withScript = false; }
   d.type = type; d.typeChosen = true;
   if (d.pivot.mode !== 'custom') d.pivot.mode = 'auto';
   S.preview.t = 0; S.preview.playing = false;
@@ -456,8 +468,10 @@ function refresh() {
   // type + settings
   for (const b of $$('.type-btn')) b.classList.toggle('on', created && d.typeChosen && b.dataset.type === d.type);
   for (const el of $$('.type-settings')) el.classList.toggle('on', el.dataset.for === d.type);
-  $('settings-tag').textContent = d.type === 'garage' ? `GARAGE · ${d.garage.kind.toUpperCase()}` : d.type.toUpperCase();
+  $('settings-tag').textContent = d.type === 'garage' ? `GARAGE · ${d.garage.kind.toUpperCase()}` : d.type === 'custom' ? 'CUSTOM ANIMATION' : d.type.toUpperCase();
   $('panel-settings').dataset.gkind = d.type === 'garage' ? d.garage.kind : '';
+  $('panel-settings').dataset.type = d.type;
+  if (d.type === 'custom') refreshCustom();
   seg('panel-settings', 'hinge', d.normal.hinge);
   $('in-angle').value = d.normal.angle; $('v-angle').textContent = d.normal.angle + '°';
   seg('panel-settings', 'sdir', d.sliding.dir);
@@ -519,7 +533,33 @@ function refresh() {
   refreshSteps();
 }
 
+// ------------------------------------------------------------------ CUSTOM ANIMATION panel (whole object, keyframes)
+function refreshCustom(force = false) {
+  const d = S.door, c = d.custom;
+  seg('anim-interp', 'ai', c.interp);
+  const tbl = $('kf-table');
+  if (!force && tbl.contains(document.activeElement)) { updateAnimInfo(); return; } // don't rebuild while typing
+  const n = (v) => +(+v).toFixed(3);
+  tbl.innerHTML = '<div class="kf-row head"><span>TIME s</span><span>ROT X°</span><span>ROT Y°</span><span>ROT Z°</span><span>MOVE X</span><span>MOVE Y</span><span>MOVE Z</span><span></span></div>' +
+    c.keys.map((k, i) => `<div class="kf-row" data-i="${i}"><input type="number" step="0.1" min="0" data-f="t" value="${n(k.t)}" title="time (seconds)"${i === 0 ? ' disabled' : ''} />` +
+      [0, 1, 2].map((j) => `<input class="rot" type="number" step="15" data-f="r${j}" value="${n(k.r[j])}" title="rotation ${'XYZ'[j]} (degrees, 360 = one turn)" />`).join('') +
+      [0, 1, 2].map((j) => `<input type="number" step="0.05" data-f="p${j}" value="${n(k.p[j])}" title="move ${'XYZ'[j]} (metres)" />`).join('') +
+      `<button class="del" data-del="${i}" title="Delete this key"${c.keys.length <= 2 || i === 0 ? ' disabled' : ''}>✕</button></div>`).join('');
+  updateAnimInfo();
+}
+function updateAnimInfo() {
+  const d = S.door, ks = D.customKeys(d), a = ks[0], b = ks[ks.length - 1];
+  const turn = (x) => { const m = ((x % 360) + 360) % 360; return Math.min(m, 360 - m) < 1e-3; };
+  const seamless = a.p.every((v, i) => Math.abs(v - b.p[i]) < 1e-4) && a.r.every((v, i) => turn(b.r[i] - v));
+  const big = ks.some((k, i) => i > 0 && k.r.some((v, j) => Math.abs(v - ks[i - 1].r[j]) > 180.001));
+  $('anim-info').innerHTML = `Loop of <b>${D.customDuration(d).toFixed(2)} s</b> · ${ks.length} keys · turns around the pivot (AUTO = centre of the model). ` +
+    'In-game it starts and loops by itself - <b>no script</b> - and the collision turns with it.' +
+    (seamless ? '' : '<br><span class="w">⚠ The last key is not the same as the first (or a full turn): the loop will jump back.</span>') +
+    (big ? '<br><span class="muted">Tip: more than 180° between two keys is fine (360° spins work).</span>' : '');
+}
+
 function engineHint(d) {
+  if (d.type === 'custom') return '';
   if (d.engine === 'ycd') return 'ANIMATED .YCD: the export makes a GTA animated fragment (.yft) + its open/close clips (.ycd) + an expression (.yed) so the COLLISION FOLLOWS the animation. A small Lua plays the clips with E, synced for every player. No GTA door sound in this mode.';
   if (d.engine === 'scripted') return 'SCRIPTED: the export adds client/server Lua that plays exactly this preview (angle, distance, speed), synced for every player (E in-game).';
   if (d.type === 'normal') return 'NATIVE (default, no script): GTA door system - a physics door players push open. Collision is embedded in the .ydr. Angle & speed only apply in SCRIPTED mode.';
@@ -538,9 +578,10 @@ function fillDoorSettings() {
   const dir = $('ds-dir');
   const opts = d.type === 'normal' ? [['left', 'Left (hinge)'], ['right', 'Right (hinge)'], ['left-flip', 'Left · flipped'], ['right-flip', 'Right · flipped']]
     : d.type === 'sliding' ? [['left', '← Left'], ['right', 'Right →'], ['up', '↑ Up'], ['down', '↓ Down']]
+      : d.type === 'custom' ? [['loop', 'Loop (auto, no script)']]
       : [['sliding', 'Garage sliding'], ['rollup', 'Garage roll up'], ['sectional', 'Garage sectional']];
   dir.innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
-  dir.value = d.type === 'normal' ? d.normal.hinge + (d.normal.flip ? '-flip' : '') : d.type === 'sliding' ? d.sliding.dir : d.garage.kind;
+  dir.value = d.type === 'normal' ? d.normal.hinge + (d.normal.flip ? '-flip' : '') : d.type === 'sliding' ? d.sliding.dir : d.type === 'custom' ? 'loop' : d.garage.kind;
   const P = pivot();
   $('ds-pivot').value = `${d.pivot.mode.toUpperCase()}  ${D.fmt(P.x, 2)}, ${D.fmt(P.y, 2)}, ${D.fmt(P.z, 2)}`;
   $('ds-angle').value = d.normal.angle;
@@ -618,6 +659,10 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 function fxmanifestLines() {
   if (!S.model || !S.door.created) return '';
   const a = archetype();
+  if (a.anim && a.anim.auto) {
+    return `-- GTA Door Creator : ${a.archetypeName} (custom animation, loops by itself)\n-- stream/${a.modelName}.yft + ${a.anim.dict}.ycd + ${a.modelName}.yed + ${a.ytypName}.ytyp\n` +
+      `data_file 'DLC_ITYP_REQUEST' 'stream/${a.ytypName}.ytyp'\n`;
+  }
   if (a.anim) {
     return `-- GTA Door Creator : ${a.archetypeName} (animated .ycd)\n-- stream/${a.modelName}.yft + ${a.anim.dict}.ycd + ${a.modelName}.yed + ${a.ytypName}.ytyp\n` +
       `data_file 'DLC_ITYP_REQUEST' 'stream/${a.ytypName}.ytyp'\n-- + the client.lua / server.lua from EXPORT FIVEM RESOURCE (plays ${a.anim.open} / ${a.anim.close})\n`;
@@ -674,7 +719,7 @@ ${K('Model:')}
 ${K('Type:')}
    ${a.anim ? `${V('Animated fragment')} <span class="h">· ASSET_TYPE_FRAGMENT · expression ${esc(a.modelName)}</span>
 ${K('Clips:')}
-   ${V(a.anim.dict)}.ycd <span class="h">→ ${esc(a.anim.open)} / ${esc(a.anim.close)}</span>` : `${V('Door')} <span class="h">· specialAttribute ${a.specialAttribute} (${D.SPECIAL_ATTR_NAMES[a.specialAttribute]})</span>`}
+   ${V(a.anim.dict)}.ycd <span class="h">→ ${a.anim.auto ? esc(a.anim.clip) + ' (auto start, loops - no script)' : esc(a.anim.open) + ' / ' + esc(a.anim.close)}</span>` : `${V('Door')} <span class="h">· specialAttribute ${a.specialAttribute} (${D.SPECIAL_ATTR_NAMES[a.specialAttribute]})</span>`}
 ${K('Bounds:')}  <span class="h">min → max</span>
    X: ${V(D.fmt(b.min[0]))} → ${V(D.fmt(b.max[0]))}
    Y: ${V(D.fmt(b.min[1]))} → ${V(D.fmt(b.max[1]))}
@@ -711,7 +756,7 @@ function refreshExport() {
   const n = a ? a.modelName : 'my_door';
   const col = d.collision.mode !== 'none';
   if (D.isAnim(d)) {
-    $('fivem-tree').textContent = `${n}/ stream/{${n}.yft, ${n}_anim.ycd, ${n}.yed, ${a ? a.ytypName : n}.ytyp} · fxmanifest.lua · client/server.lua`;
+    $('fivem-tree').textContent = `${n}/ stream/{${n}.yft, ${n}_anim.ycd, ${n}.yed, ${a ? a.ytypName : n}.ytyp} · fxmanifest.lua${d.type === 'custom' ? ' · no script (auto loop)' : ' · client/server.lua'}`;
     $('ex-ydr').textContent = 'EXPORT YFT+YCD'; $('ex-ybn').disabled = true;
     return;
   }
@@ -739,6 +784,7 @@ function exportJob(outDir, outputs) {
       flags: a.flags, specialAttribute: a.specialAttribute, textureDictionary: a.textureDictionary, physicsDictionary: a.archetypeName,
     },
     anim: a.anim ? (() => {
+      if (a.anim.auto) return { dict: a.anim.dict, samples: D.customSamples(S.door) };
       const ms = D.motionSpec(S.door, S.an, pivot());
       return { kind: ms.kind, axis: ms.axis, angle: ms.angle, center: ms.center, offset: ms.offset, duration: D.duration(S.door), dict: a.anim.dict };
     })() : undefined,
@@ -753,7 +799,7 @@ async function doExport(outputs, label) {
     const res = await api.exportFiles(exportJob(dir, outputs));
     for (const f of res.files) log(`  ✓ ${f}`, 'ok');
     if (outputs.ydr && outputs.ytyp && D.isAnim(S.door)) {
-      log('  ⧉ Put these 4 files in stream/ and use EXPORT FIVEM RESOURCE for the Lua that plays the clips', 'w');
+      log(S.door.type === 'custom' ? '  ⧉ Put these 4 files in stream/ + the data_file line (COPY FXMANIFEST): the animation loops by itself, no script' : '  ⧉ Put these 4 files in stream/ and use EXPORT FIVEM RESOURCE for the Lua that plays the clips', 'w');
     } else if (outputs.ydr && outputs.ytyp) {
       const a = archetype();
       const audio = await writeAudio(dir, a);
@@ -783,8 +829,8 @@ async function exportFiveM() {
     if (!r) return;
   }
   const anim = D.isAnim(S.door);
-  const withScript = anim || S.door.export.withScript === true;
-  if (!withScript && S.door.engine !== 'native') {
+  const withScript = (anim && S.door.type !== 'custom') || S.door.export.withScript === true;
+  if (!withScript && !anim && S.door.engine !== 'native') {
     S.door.engine = 'native'; refresh();
     toast('No-script resource: switched to NATIVE DOOR (the GTA door system moves it)', 'ok');
   }
@@ -920,7 +966,7 @@ async function openProject(path) {
     } else S.ybn = null;
     const res = await api.load(mp);
     const door = Object.assign(D.defaultDoor(), proj.door);
-    for (const k of ['normal', 'sliding', 'garage', 'pivot', 'collision', 'sound', 'ytyp', 'export']) door[k] = Object.assign(D.defaultDoor()[k], proj.door[k] || {});
+    for (const k of ['normal', 'sliding', 'garage', 'pivot', 'collision', 'sound', 'ytyp', 'export', 'custom']) door[k] = Object.assign(D.defaultDoor()[k], proj.door[k] || {});
     if (S.ybn) door.collision.ybnPath = S.ybn.path;
     if (proj.door.export && proj.door.export.withScript === undefined) door.export.withScript = proj.door.engine !== 'native';
     S.ytypGenerated = !!proj.state?.ytypGenerated; S.exported = !!proj.state?.exported; S.configured = !!proj.state?.configured;
@@ -1052,6 +1098,30 @@ function bind() {
 
   // door settings
   $('btn-apply').onclick = applyDoorSettings;
+
+  // custom animation
+  $$('[data-ap]').forEach((b) => b.onclick = () => { S.door.custom = JSON.parse(JSON.stringify(D.ANIM_PRESETS[b.dataset.ap])); S.preview.t = 0; touch(); refreshCustom(true); play(); });
+  $$('[data-ai]').forEach((b) => b.onclick = () => { S.door.custom.interp = b.dataset.ai; touch(); });
+  $('kf-table').addEventListener('input', (e) => {
+    const inp = e.target, row = inp.closest('.kf-row');
+    if (!row || !inp.dataset.f) return;
+    const k = S.door.custom.keys[+row.dataset.i], f = inp.dataset.f, v = Number(inp.value) || 0;
+    if (f === 't') k.t = Math.max(0, v); else k[f[0]][+f[1]] = v;
+    touch();
+  });
+  $('kf-table').addEventListener('change', () => { S.door.custom.keys.sort((a, b) => a.t - b.t); refreshCustom(true); });
+  $('kf-table').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-del]'); if (!b || b.disabled) return;
+    S.door.custom.keys.splice(+b.dataset.del, 1); touch(); refreshCustom(true);
+  });
+  $('kf-add').onclick = () => { const ks = S.door.custom.keys, last = ks[ks.length - 1]; ks.push({ t: +(last.t + 1).toFixed(2), r: [...last.r], p: [...last.p] }); touch(); refreshCustom(true); };
+  $('kf-addnow').onclick = () => {
+    const d = S.door, t = +(S.preview.t * D.customDuration(d)).toFixed(2);
+    if (d.custom.keys.some((k) => Math.abs(k.t - t) < 1e-3)) { toast(`There is already a key at ${t} s`, 'err'); return; }
+    const pose = D.customPose(d, t);
+    d.custom.keys.push({ t, r: pose.r.map((v) => +v.toFixed(2)), p: pose.p.map((v) => +v.toFixed(3)) });
+    d.custom.keys.sort((a, b) => a.t - b.t); touch(); refreshCustom(true);
+  };
   $('ds-type').onchange = () => { const d = S.door; const t = $('ds-type').value; const save = d.type; d.type = t; fillDirOptionsOnly(); d.type = save; };
 
   // presets
@@ -1135,6 +1205,7 @@ function fillDirOptionsOnly() { const keep = S.door.type; fillDoorSettingsDirOnl
 function fillDoorSettingsDirOnly(type) {
   const opts = type === 'normal' ? [['left', 'Left (hinge)'], ['right', 'Right (hinge)'], ['left-flip', 'Left · flipped'], ['right-flip', 'Right · flipped']]
     : type === 'sliding' ? [['left', '← Left'], ['right', 'Right →'], ['up', '↑ Up'], ['down', '↓ Down']]
+      : type === 'custom' ? [['loop', 'Loop (auto, no script)']]
       : [['sliding', 'Garage sliding'], ['rollup', 'Garage roll up'], ['sectional', 'Garage sectional']];
   $('ds-dir').innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
 }
@@ -1142,6 +1213,7 @@ function fillDoorSettingsDirOnly(type) {
 function play() {
   if (!S.door.created) return;
   const p = S.preview;
+  if (S.door.type === 'custom') { if (p.t >= 0.999) p.t = 0; p.dir = 1; p.playing = true; p.played = true; refreshSteps(); applyPreview(); return; }
   if (!p.loop) p.dir = p.t >= 0.999 ? -1 : 1;
   else if (p.t >= 0.999) p.dir = -1; else if (p.t <= 0.001) p.dir = 1;
   p.playing = true; p.played = true; refreshSteps(); applyPreview();

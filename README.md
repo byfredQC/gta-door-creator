@@ -38,6 +38,7 @@ Nothing else to install: the release build includes everything (no .NET, no Blen
 | **Collision** | Embedded **inside the `.ydr`** (it moves with the door): auto box, convex hull, custom box, imported `.ybn`, or keep the model's own. |
 | **Door sound** | Uses GTA's own door sounds — **no script**. 47 sounds from the game (wood, glass shop, fire door, jail bars, garage, roller shutter, prison gate…). Vanilla models keep their original sound automatically. |
 | **Animated .ycd** | Third mode **ANIMATED .YCD**: exports the door as a GTA animated fragment — `.yft` (root + door bone) + `.ycd` (open / close clips baked from the preview) + `.yed` (expression) + fragment `.ytyp`. The **collision follows the animation**. A small Lua plays the clips with E, synced for all players. |
+| **Custom animation** | Door type **CUSTOM ANIM**: animate any prop with keyframes (rotation X/Y/Z in degrees, 360 = one turn, + movement in metres), presets *spin 360°*, *swing*, *bob*. Exported as an animated fragment that **starts and loops by itself in-game — no script** (logos, signs, fans…). |
 | **YTYP** | Live archetype preview (summary / XML), flags, LOD, HD LOD, texture dictionary. |
 | **Export** | `EXPORT YDR / YTYP / YBN / ALL` and **EXPORT FIVEM RESOURCE**. |
 | **Sound only** | Already made a door? **♪ SOUND ONLY** adds a GTA door sound to existing doors (type the model names or read them from a `.ytyp`) — just one small audio file + the fxmanifest lines, nothing else changed. |

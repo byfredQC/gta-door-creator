@@ -135,7 +135,8 @@ kbd { font: 11px var(--mono); color: var(--text3); }
 .why { font-size: 11px; color: var(--text3); margin-top: 6px; }
 
 /* type buttons */
-.type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.type-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.type-grid .type-btn { font-size: 10px; }
 .type-btn { background: var(--bg3); border: 1.5px solid var(--line2); border-radius: 7px; padding: 12px 4px 9px; cursor: pointer;
   font: 700 11.5px var(--font-head); letter-spacing: .08em; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .type-btn:hover { border-color: #5b4a78; }
@@ -311,3 +312,19 @@ body.dragging .drop-overlay { display: flex; }
 .so-file { display: flex; align-items: center; gap: 6px; }
 .so-file input { flex: 1; font-family: var(--mono); }
 .so-fx { max-height: 150px; min-height: 60px; font-size: 11px; }
+
+/* custom animation */
+.ti-custom::before { left: 6px; top: 6px; width: 24px; height: 24px; border: 2.5px solid currentColor; border-right-color: transparent; border-radius: 50%; }
+.ti-custom::after { left: 27px; top: 6px; width: 0; height: 0; border: 5px solid transparent; border-top-color: currentColor; transform: rotate(35deg); }
+#panel-settings[data-type="custom"] .not-custom { display: none; }
+.kf-table { display: grid; gap: 3px; margin-bottom: 7px; }
+.kf-row { display: grid; grid-template-columns: 44px repeat(6, minmax(0, 1fr)) 20px; gap: 3px; align-items: center; }
+.kf-row.head { font: 600 9.5px var(--font-head); letter-spacing: .05em; color: var(--text3); text-align: center; }
+.kf-row input { width: 100%; min-width: 0; padding: 4px 3px; font: 11px var(--mono); text-align: right; background: var(--bg0); border: 1px solid var(--line2); border-radius: 4px; color: var(--text); }
+.kf-row input:focus { border-color: var(--accent); outline: none; }
+.kf-row input.rot { color: var(--accent2); }
+.kf-row .del { background: none; border: 0; color: var(--text3); cursor: pointer; font-size: 13px; padding: 0; }
+.kf-row .del:hover { color: #ff6b8a; }
+.kf-row .del:disabled { visibility: hidden; }
+.kf-row input::-webkit-outer-spin-button, .kf-row input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.kf-row input { -moz-appearance: textfield; padding: 4px 2px; font-size: 10.5px; }

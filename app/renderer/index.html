@@ -88,6 +88,7 @@
         <button class="type-btn" data-type="normal"><span class="ti ti-normal"></span>NORMAL DOOR</button>
         <button class="type-btn" data-type="sliding"><span class="ti ti-sliding"></span>SLIDING DOOR</button>
         <button class="type-btn" data-type="garage"><span class="ti ti-garage"></span>GARAGE DOOR</button>
+        <button class="type-btn" data-type="custom" title="Any prop: a logo that spins, a sign that swings... loops by itself in-game (no script)"><span class="ti ti-custom"></span>CUSTOM ANIM</button>
       </div>
     </section>
 
@@ -146,6 +147,22 @@
         <label class="check g-sect-check"><input type="checkbox" id="in-ingame" /> Preview the in-game motion <span class="muted" id="ingame-note"></span></label>
       </div>
 
+      <!-- CUSTOM ANIMATION -->
+      <div class="type-settings" data-for="custom">
+        <label class="lbl">Presets</label>
+        <div class="seg chips" id="anim-presets">
+          <button data-ap="spinz">SPIN 360° Z</button><button data-ap="spinx">SPIN 360° X</button><button data-ap="spiny">SPIN 360° Y</button>
+          <button data-ap="swing">SWING ±30°</button><button data-ap="bob">BOB UP/DOWN</button><button data-ap="spinbob">SPIN + BOB</button>
+        </div>
+        <label class="lbl">Interpolation</label>
+        <div class="seg" id="anim-interp"><button data-ai="linear" title="Constant speed - best for spins">LINEAR</button><button data-ai="smooth" title="Slows down at every key - best for swings">SMOOTH</button></div>
+        <label class="lbl">Keyframes</label>
+        <div class="kf-table" id="kf-table"></div>
+        <div class="row2"><button class="btn" id="kf-add">+ ADD KEY</button><button class="btn" id="kf-addnow" title="Add a key at the preview slider position">+ KEY AT PREVIEW</button></div>
+        <div class="hint" id="anim-info"></div>
+      </div>
+
+      <div class="not-custom">
       <label class="lbl">Opening Speed</label>
       <div class="seg three" id="speed-seg">
         <button data-speed="slow">SLOW</button><button data-speed="normal">NORMAL</button><button data-speed="fast">FAST</button>
@@ -158,6 +175,7 @@
         <button data-engine="ycd" title="GTA animation: .yft fragment + .ycd clips + .yed - the collision follows the animation">ANIMATED .YCD</button>
       </div>
       <div class="hint" id="engine-hint"></div>
+      </div>
     </section>
 
     <section class="panel locked" id="panel-pivot">
@@ -218,7 +236,7 @@
       <h2>DOOR SETTINGS</h2>
       <div class="form">
         <label>Name<input type="text" id="ds-name" spellcheck="false" /></label>
-        <label>Type<select id="ds-type"><option value="normal">Normal</option><option value="sliding">Sliding</option><option value="garage">Garage</option></select></label>
+        <label>Type<select id="ds-type"><option value="normal">Normal</option><option value="sliding">Sliding</option><option value="garage">Garage</option><option value="custom">Custom animation</option></select></label>
         <label>Direction<select id="ds-dir"></select></label>
         <label>Pivot<input type="text" id="ds-pivot" readonly /></label>
         <label>Opening Angle<input type="number" id="ds-angle" min="0" max="180" /></label>

@@ -367,6 +367,12 @@ export class Viewer {
       }
       return;
     }
+    if (door.type === 'custom') {
+      const pose = D.customPose(door, t * D.customDuration(door));
+      this.doorPivot.quaternion.set(pose.q[0], pose.q[1], pose.q[2], pose.q[3]);
+      this.doorPivot.position.set(pivot.x + pose.p[0], pivot.y + pose.p[1], pivot.z + pose.p[2]);
+      return;
+    }
     const ms = D.motionSpec(door, an, pivot);
     const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...ms.axis).normalize(), ms.angle * Math.PI / 180 * e);
     const C = new THREE.Vector3(...ms.center);

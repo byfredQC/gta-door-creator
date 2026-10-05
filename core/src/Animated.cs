@@ -8,7 +8,7 @@
 //  - two groups minimum: the root group is the entity body and never follows a bone
 //  - clips <name>_open / <name>_close (never the model name), Hash + AnimationHash set, Track 0/1/2 for every bone
 //  - yed: Tracks = (T, 1, quaternion), Streams empty, Signature 3140693525, Unk7C 3
-//  - ytyp: ASSET_TYPE_FRAGMENT, flags 537526816 (vanilla animated fragment 537526784 = Dynamic + Auto Start Anim
+//  - ytyp: ASSET_TYPE_FRAGMENT, flags 537526816 (vanilla animated fragment 537526784 = Has Anim + Dynamic + Auto Start Anim
 //          + Use Ambient Scale, plus Static 32 so it never falls), clipDictionary,
 //          physicsDictionary = itself, expression extension with bare names, bbox covers the whole motion
 using System;
@@ -26,7 +26,7 @@ namespace DoorCore
 {
     public static class Animated
     {
-        public const uint FragFlags = 537526816;          // 536870912 Use Ambient Scale + 524288 Auto Start Anim + 131072 Dynamic + 32 Static
+        public const uint FragFlags = 537526816;          // 536870912 Use Ambient Scale + 524288 Auto Start Anim + 131072 Dynamic + 512 Has Anim (YCD) + 32 Static
         const uint YedSignature = 3140693525;
         const string AnimUnk1C = "hash_22E95D79";
         const string PropTypeFlags = "OBJECT";
@@ -69,6 +69,46 @@ namespace DoorCore
             return m;
         }
 
+        // one clip = baked frames of the door bone (rotation + position, model space)
+        public class Clip
+        {
+            public string Name;
+            public float Fps = 30f;
+            public Quaternion[] Q;
+            public Vector3[] P;
+            public float Duration => (Q.Length - 1) / Fps;
+        }
+
+        static Clip MotionClip(Motion m, string name, bool closing)
+        {
+            float fps = Math.Min(30f, 240f / m.Duration);
+            int frames = Math.Max(2, (int)Math.Round(m.Duration * fps) + 1);
+            var c = new Clip { Name = name, Fps = fps, Q = new Quaternion[frames], P = new Vector3[frames] };
+            for (int i = 0; i < frames; i++)
+            {
+                float u = i / (float)(frames - 1); if (closing) u = 1 - u;
+                c.Q[i] = m.Rot(u); c.P[i] = m.Pos(u);
+            }
+            return c;
+        }
+
+        // custom animation: frames sampled by the app ([qx,qy,qz,qw,px,py,pz] per frame)
+        static Clip SampledClip(JsonObject s, string name)
+        {
+            float fps = (float?)s["fps"] ?? 30f;
+            var fr = s["frames"] as JsonArray ?? throw new Exception("Animation has no frames");
+            if (fr.Count < 2) throw new Exception("Animation needs at least 2 frames");
+            if (fr.Count > 3600) throw new Exception("Animation is too long (max 2 minutes at 30 fps)");
+            var c = new Clip { Name = name, Fps = fps, Q = new Quaternion[fr.Count], P = new Vector3[fr.Count] };
+            for (int i = 0; i < fr.Count; i++)
+            {
+                var a = (fr[i] as JsonArray).Select(x => (float)x).ToArray();
+                c.Q[i] = Quaternion.Normalize(new Quaternion(a[0], a[1], a[2], a[3]));
+                c.P[i] = new Vector3(a[4], a[5], a[6]);
+            }
+            return c;
+        }
+
         // ------------------------------------------------------------------ entry
         public static JsonNode Export(JsonObject req)
         {
@@ -81,10 +121,19 @@ namespace DoorCore
             var y = req["ytyp"] as JsonObject ?? new JsonObject();
             var outputs = req["outputs"] as JsonObject ?? new JsonObject();
             bool wantModel = (bool?)outputs["ydr"] ?? true, wantYtyp = (bool?)outputs["ytyp"] ?? true;
-            var motion = ReadMotion(anim);
             var dict = Exporter.San((string)anim["dict"] ?? (name + "_anim"));
             if (dict == name) dict = name + "_anim";
-            string clipOpen = name + "_open", clipClose = name + "_close";
+            // door: two clips played by Lua. custom: ONE clip named like the model - GTA auto-starts and loops it (no script)
+            bool custom = anim["samples"] is JsonObject;
+            var clips = new List<Clip>();
+            if (custom) clips.Add(SampledClip((JsonObject)anim["samples"], Exporter.San((string)y["archetypeName"] ?? name)));  // auto start plays the clip named like the archetype
+            else
+            {
+                var motion = ReadMotion(anim);
+                clips.Add(MotionClip(motion, name + "_open", false));
+                clips.Add(MotionClip(motion, name + "_close", true));
+            }
+            bool moves = clips.Any(c => c.P.Any(v => v.Length() > 1e-5f));
             ushort tag = BoneTag(name);
             Directory.CreateDirectory(outDir);
             var warnings = new JsonArray();
@@ -110,7 +159,7 @@ namespace DoorCore
             d.Bound = null;
 
             // swept bounds: the archetype / drawable box must contain the whole motion
-            var (sMin, sMax) = Swept(motion, Vector3.Min(d.BoundingBoxMin, cMin), Vector3.Max(d.BoundingBoxMax, cMax));
+            var (sMin, sMax) = Swept(clips, Vector3.Min(d.BoundingBoxMin, cMin), Vector3.Max(d.BoundingBoxMax, cMax));
 
             var texDir = Path.Combine(Path.GetTempPath(), "gdc_anim_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(texDir);
@@ -128,7 +177,7 @@ namespace DoorCore
                     if ((bool?)req["writeXml"] ?? false) File.WriteAllText(yftPath + ".xml", fragXml);
 
                     // .ycd
-                    var ycdXml = BuildYcdXml(motion, tag, clipOpen, clipClose);
+                    var ycdXml = BuildYcdXml(clips, tag);
                     var cdoc = new XmlDocument(); cdoc.LoadXml(ycdXml);
                     var ycdBytes = XmlMeta.GetYcdData(cdoc) ?? throw new Exception("YCD build failed");
                     var ycdPath = Path.Combine(outDir, dict + ".ycd");
@@ -137,14 +186,14 @@ namespace DoorCore
                     if ((bool?)req["writeXml"] ?? false) File.WriteAllText(ycdPath + ".xml", ycdXml);
 
                     // .yed
-                    var yedXml = BuildYedXml(name, tag, motion);
+                    var yedXml = BuildYedXml(name, tag, moves);
                     var edoc = new XmlDocument(); edoc.LoadXml(yedXml);
                     var yedBytes = XmlMeta.GetYedData(edoc, "") ?? throw new Exception("YED build failed");
                     var yedPath = Path.Combine(outDir, name + ".yed");
                     File.WriteAllBytes(yedPath, yedBytes);
                     files.Add(yedPath);
 
-                    Verify(yftBytes, ycdBytes, yedBytes, name, tag, clipOpen, clipClose, warnings);
+                    Verify(yftBytes, ycdBytes, yedBytes, name, tag, clips.Select(c => c.Name).ToArray(), warnings);
                 }
             }
             finally { try { Directory.Delete(texDir, true); } catch { } }
@@ -154,8 +203,8 @@ namespace DoorCore
             var info = new JsonObject
             {
                 ["bbMin"] = Util.V3(sMin), ["bbMax"] = Util.V3(sMax), ["bsCentre"] = Util.V3(centre), ["bsRadius"] = Util.R(radius),
-                ["dict"] = dict, ["clipOpen"] = clipOpen, ["clipClose"] = clipClose, ["boneTag"] = tag,
-                ["duration"] = Util.R(motion.Duration)
+                ["dict"] = dict, ["clips"] = new JsonArray(clips.Select(c => (JsonNode)c.Name).ToArray()), ["boneTag"] = tag,
+                ["duration"] = Util.R(clips[0].Duration), ["autoStart"] = custom
             };
             if (wantYtyp)
             {
@@ -175,16 +224,14 @@ namespace DoorCore
 
         public static ushort BoneTag(string name) => (ushort)(1000 + JenkHash.GenHash(name + "_door") % 60000);
 
-        static (Vector3, Vector3) Swept(Motion m, Vector3 mn, Vector3 mx)
+        static (Vector3, Vector3) Swept(List<Clip> clips, Vector3 mn, Vector3 mx)
         {
             var corners = new List<Vector3>();
             for (int i = 0; i < 8; i++) corners.Add(new Vector3((i & 1) != 0 ? mx.X : mn.X, (i & 2) != 0 ? mx.Y : mn.Y, (i & 4) != 0 ? mx.Z : mn.Z));
             Vector3 a = mn, b = mx;
-            for (int s = 0; s <= 48; s++)
-            {
-                float u = s / 48f;
-                foreach (var c in corners) { var p = m.Apply(c, u); a = Vector3.Min(a, p); b = Vector3.Max(b, p); }
-            }
+            foreach (var cl in clips)
+                for (int f = 0; f < cl.Q.Length; f++)
+                    foreach (var c in corners) { var p = Vector3.Transform(c, cl.Q[f]) + cl.P[f]; a = Vector3.Min(a, p); b = Vector3.Max(b, p); }
             return (a, b);
         }
 
@@ -336,7 +383,7 @@ namespace DoorCore
         {
             float mn = vals.Min(), mx = vals.Max();
             if (mx - mn < 1e-6f) return $"<Item><Type value=\"StaticFloat\" /><Value value=\"{F(vals[0])}\" /></Item>";
-            float q = (mx - mn) / 65535f;
+            float q = (mx - mn) / 1048575f; // 20 bits
             var sb = new StringBuilder();
             sb.Append($"<Item><Type value=\"QuantizeFloat\" /><Quantum value=\"{F(q)}\" /><Offset value=\"{F(mn)}\" /><Values>");
             sb.Append(string.Join(" ", vals.Select(F)));
@@ -344,33 +391,47 @@ namespace DoorCore
             return sb.ToString();
         }
 
-        static string BuildYcdXml(Motion m, ushort tag, string clipOpen, string clipClose)
+        // Rotation channels: 3 stored components + CachedQuaternion1 (the 4th is rebuilt as +sqrt(1 - others²)).
+        // Drop a component that keeps one sign over the whole clip so the stored values never jump
+        // (a 360° spin about Z: w goes 1 -> -1 but z stays >= 0 -> drop z).
+        static string RotationChannels(Quaternion[] qs)
         {
-            float fps = Math.Min(30f, 240f / m.Duration);
-            int frames = Math.Max(2, (int)Math.Round(m.Duration * fps) + 1);
-            float dur = (frames - 1) / fps;
+            var q = (Quaternion[])qs.Clone();
+            for (int i = 1; i < q.Length; i++) if (Quaternion.Dot(q[i], q[i - 1]) < 0) q[i] = -q[i];
+            // among the components that keep one sign, drop the biggest one (rebuilding a value near 0 amplifies quantization noise)
+            int drop = -1; float best = -1; bool neg = false;
+            foreach (var c in new[] { 3, 0, 1, 2 })
+            {
+                bool pos = q.All(v => v[c] >= -1e-6f), ng = q.All(v => v[c] <= 1e-6f);
+                if (!pos && !ng) continue;
+                float mag = q.Average(v => Math.Abs(v[c]));
+                if (mag > best + 1e-4f) { best = mag; drop = c; neg = !pos; }
+            }
+            if (drop >= 0 && neg) for (int i = 0; i < q.Length; i++) q[i] = -q[i];
+            if (drop < 0) { drop = 3; for (int i = 0; i < q.Length; i++) if (q[i].W < 0) q[i] = -q[i]; }
+            var sb = new StringBuilder("<Item><Channels>");
+            for (int c = 0; c < 4; c++) if (c != drop) sb.Append(FloatChannel(q.Select(v => v[c]).ToArray()));
+            sb.Append($"<Item><Type value=\"CachedQuaternion1\" /><QuatIndex value=\"{drop}\" /></Item></Channels></Item>");
+            return sb.ToString();
+        }
+
+        static string BuildYcdXml(List<Clip> clips, ushort tag)
+        {
             var sb = new StringBuilder();
             sb.Append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ClipDictionary>\n <Clips>\n");
-            foreach (var c in new[] { clipOpen, clipClose })
+            foreach (var cl in clips)
             {
+                var c = cl.Name;
                 sb.Append($"  <Item><Hash>{c}</Hash><Name>pack:/{c}.clip</Name><Type value=\"Animation\" /><Unknown30 value=\"1\" /><Tags />");
                 sb.Append("<Properties><Item><NameHash>hash_BF6A5D60</NameHash><UnkHash>hash_996C3B27</UnkHash><Attributes><Item><NameHash>hash_BF6A5D60</NameHash><Type value=\"Int\" /><Value value=\"32\" /></Item></Attributes></Item></Properties>");
-                sb.Append($"<AnimationHash>{c}</AnimationHash><StartTime value=\"0\" /><EndTime value=\"{F(dur)}\" /><Rate value=\"1\" /></Item>\n");
+                sb.Append($"<AnimationHash>{c}</AnimationHash><StartTime value=\"0\" /><EndTime value=\"{F(cl.Duration)}\" /><Rate value=\"1\" /></Item>\n");
             }
             sb.Append(" </Clips>\n <Animations>\n");
-            foreach (var c in new[] { clipOpen, clipClose })
+            foreach (var cl in clips)
             {
-                bool closing = c == clipClose;
-                var px = new float[frames]; var py = new float[frames]; var pz = new float[frames];
-                var qx = new float[frames]; var qy = new float[frames]; var qz = new float[frames];
-                for (int i = 0; i < frames; i++)
-                {
-                    float u = i / (float)(frames - 1); if (closing) u = 1 - u;
-                    var p = m.Pos(u); var q = m.Rot(u);
-                    if (q.W < 0) q = -q; // keep w positive: it is the reconstructed component
-                    px[i] = p.X; py[i] = p.Y; pz[i] = p.Z; qx[i] = q.X; qy[i] = q.Y; qz[i] = q.Z;
-                }
-                sb.Append($"  <Item><Hash>{c}</Hash><Unknown10 value=\"1\" /><FrameCount value=\"{frames}\" /><SequenceFrameLimit value=\"{frames + 30}\" /><Duration value=\"{F(dur)}\" /><Unknown1C>{AnimUnk1C}</Unknown1C>");
+                var c = cl.Name; int frames = cl.Q.Length;
+                var px = cl.P.Select(v => v.X).ToArray(); var py = cl.P.Select(v => v.Y).ToArray(); var pz = cl.P.Select(v => v.Z).ToArray();
+                sb.Append($"  <Item><Hash>{c}</Hash><Unknown10 value=\"1\" /><FrameCount value=\"{frames}\" /><SequenceFrameLimit value=\"{frames + 30}\" /><Duration value=\"{F(cl.Duration)}\" /><Unknown1C>{AnimUnk1C}</Unknown1C>");
                 sb.Append("<BoneIds>");
                 foreach (var tr in new[] { 0, 1, 2 })
                     foreach (var b in new[] { 0, (int)tag })
@@ -379,18 +440,19 @@ namespace DoorCore
                 sb.Append($"<Sequences><Item><Hash>hash_{JenkHash.GenHash(c + "_seq"):X8}</Hash><FrameCount value=\"{frames}\" /><SequenceData>");
                 string stat3(Vector3 v) => $"<Item><Channels><Item><Type value=\"StaticVector3\" /><Value x=\"{F(v.X)}\" y=\"{F(v.Y)}\" z=\"{F(v.Z)}\" /></Item></Channels></Item>";
                 const string statQ = "<Item><Channels><Item><Type value=\"StaticQuaternion\" /><Value x=\"0\" y=\"0\" z=\"0\" w=\"1\" /></Item></Channels></Item>";
-                // track 0: root, door
+                // track 0 (position): root, door
                 sb.Append(stat3(Vector3.Zero));
-                if (px.Max() - px.Min() < 1e-6f && py.Max() - py.Min() < 1e-6f && pz.Max() - pz.Min() < 1e-6f) sb.Append(stat3(new Vector3(px[0], py[0], pz[0])));
+                if (px.Max() - px.Min() < 1e-6f && py.Max() - py.Min() < 1e-6f && pz.Max() - pz.Min() < 1e-6f) sb.Append(stat3(cl.P[0]));
                 else sb.Append("<Item><Channels>" + FloatChannel(px) + FloatChannel(py) + FloatChannel(pz) + "</Channels></Item>");
-                // track 1: root, door
+                // track 1 (rotation): root, door
                 sb.Append(statQ);
-                if (qx.Max() - qx.Min() < 1e-7f && qy.Max() - qy.Min() < 1e-7f && qz.Max() - qz.Min() < 1e-7f)
+                bool still = cl.Q.All(v => Math.Abs(Quaternion.Dot(v, cl.Q[0])) > 0.9999999f);
+                if (still)
                 {
-                    var q0 = m.Rot(closing ? 1 : 0);
+                    var q0 = cl.Q[0];
                     sb.Append($"<Item><Channels><Item><Type value=\"StaticQuaternion\" /><Value x=\"{F(q0.X)}\" y=\"{F(q0.Y)}\" z=\"{F(q0.Z)}\" w=\"{F(q0.W)}\" /></Item></Channels></Item>");
                 }
-                else sb.Append("<Item><Channels>" + FloatChannel(qx) + FloatChannel(qy) + FloatChannel(qz) + "<Item><Type value=\"CachedQuaternion1\" /><QuatIndex value=\"3\" /></Item></Channels></Item>");
+                else sb.Append(RotationChannels(cl.Q));
                 // track 2 (scale): root, door
                 sb.Append(stat3(Vector3.One)).Append(stat3(Vector3.One));
                 sb.Append("</SequenceData></Item></Sequences></Item>\n");
@@ -400,10 +462,10 @@ namespace DoorCore
         }
 
         // ------------------------------------------------------------------ .yed
-        static string BuildYedXml(string name, ushort tag, Motion m)
+        static string BuildYedXml(string name, ushort tag, bool moves)
         {
             var tracks = new StringBuilder();
-            if (m.Moves) tracks.Append($"<Item><BoneId value=\"{tag}\" /><Track value=\"0\" /><Format value=\"0\" /><UnkFlag value=\"False\" /></Item>");
+            if (moves) tracks.Append($"<Item><BoneId value=\"{tag}\" /><Track value=\"0\" /><Format value=\"0\" /><UnkFlag value=\"False\" /></Item>");
             tracks.Append($"<Item><BoneId value=\"{tag}\" /><Track value=\"1\" /><Format value=\"1\" /><UnkFlag value=\"False\" /></Item>");
             return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ExpressionDictionary><Item>" +
                 $"<Name>pack:/{name}.expr</Name><Signature value=\"{YedSignature}\" /><Unk7C value=\"3\" /><Tracks>{tracks}</Tracks>" +
@@ -433,7 +495,7 @@ namespace DoorCore
         }
 
         // ------------------------------------------------------------------ read back
-        static void Verify(byte[] yft, byte[] ycd, byte[] yed, string name, ushort tag, string clipOpen, string clipClose, JsonArray warnings)
+        static void Verify(byte[] yft, byte[] ycd, byte[] yed, string name, ushort tag, string[] clipNames, JsonArray warnings)
         {
             var f = new YftFile(); RpfFile.LoadResourceFile(f, yft, 162);
             var lod = f.Fragment?.PhysicsLODGroup?.PhysicsLOD1;
@@ -446,8 +508,8 @@ namespace DoorCore
 
             var c = new YcdFile(); RpfFile.LoadResourceFile(c, ycd, 46);
             var cm = c.ClipMap; var am = c.AnimMap;
-            if (cm == null || !cm.ContainsKey(JenkHash.GenHash(clipOpen)) || !cm.ContainsKey(JenkHash.GenHash(clipClose))) throw new Exception("YCD check failed: clips");
-            if (am == null || am.Count != 2) throw new Exception("YCD check failed: animations");
+            if (cm == null || clipNames.Any(n => !cm.ContainsKey(JenkHash.GenHash(n)))) throw new Exception("YCD check failed: clips");
+            if (am == null || am.Count != clipNames.Length) throw new Exception("YCD check failed: animations");
             foreach (var ca in cm.Values)
             {
                 var anim = (ca.Clip as ClipAnimation)?.Animation;
