@@ -28,7 +28,7 @@ Nothing else to install: the release build includes everything (no .NET, no Blen
 
 ## Features
 
-The app opens on a **home page** with 4 big choices: **CREATE DOOR**, **DOOR SOUND**, **ANIMATION**, **DESTRUCT**, **TREE LOD** (⌂ HOME in the top bar brings it back).
+The app opens on a **home page** with 5 big choices: **CREATE DOOR**, **DOOR SOUND**, **ANIMATION**, **DESTRUCT**, **TREE LOD** (⌂ HOME in the top bar brings it back).
 
 
 | | |
