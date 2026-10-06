@@ -379,7 +379,7 @@ namespace DoorCore
             "<LodDistHigh value=\"0\" /><LodDistMed value=\"0\" /><LodDistLow value=\"0\" /><LodDistVlow value=\"0\" /><FlagsHigh value=\"0\" /><FlagsMed value=\"0\" /><FlagsLow value=\"0\" /><FlagsVlow value=\"0\" /></Drawable></Item>\n";
 
         // ------------------------------------------------------------------ .ycd
-        static string FloatChannel(float[] vals)
+        internal static string FloatChannel(float[] vals)
         {
             float mn = vals.Min(), mx = vals.Max();
             if (mx - mn < 1e-6f) return $"<Item><Type value=\"StaticFloat\" /><Value value=\"{F(vals[0])}\" /></Item>";
@@ -394,7 +394,7 @@ namespace DoorCore
         // Rotation channels: 3 stored components + CachedQuaternion1 (the 4th is rebuilt as +sqrt(1 - others²)).
         // Drop a component that keeps one sign over the whole clip so the stored values never jump
         // (a 360° spin about Z: w goes 1 -> -1 but z stays >= 0 -> drop z).
-        static string RotationChannels(Quaternion[] qs)
+        internal static string RotationChannels(Quaternion[] qs)
         {
             var q = (Quaternion[])qs.Clone();
             for (int i = 1; i < q.Length; i++) if (Quaternion.Dot(q[i], q[i - 1]) < 0) q[i] = -q[i];
@@ -449,7 +449,7 @@ namespace DoorCore
                 bool still = cl.Q.All(v => Math.Abs(Quaternion.Dot(v, cl.Q[0])) > 0.9999999f);
                 if (still)
                 {
-                    var q0 = cl.Q[0];
+                    var q0 = cl.Q[0]; if (q0.W < 0) q0 = -q0;   // a static quaternion is stored as xyz, w rebuilt >= 0
                     sb.Append($"<Item><Channels><Item><Type value=\"StaticQuaternion\" /><Value x=\"{F(q0.X)}\" y=\"{F(q0.Y)}\" z=\"{F(q0.Z)}\" w=\"{F(q0.W)}\" /></Item></Channels></Item>");
                 }
                 else sb.Append(RotationChannels(cl.Q));
@@ -523,7 +523,7 @@ namespace DoorCore
             if (ex[0].Signature != YedSignature || !(ex[0].Tracks?.data_items?.Any(t => t.BoneId == tag && t.Track == 1) ?? false)) throw new Exception("YED check failed: tracks");
         }
 
-        static void VerifyYtyp(byte[] data, string arch, string model, string dict, JsonArray warnings)
+        internal static void VerifyYtyp(byte[] data, string arch, string model, string dict, JsonArray warnings)
         {
             var y = new YtypFile(); y.Load(data);
             var a = y.AllArchetypes?.FirstOrDefault(x => x._BaseArchetypeDef.name.Hash == JenkHash.GenHash(arch)) ?? throw new Exception("YTYP check failed");

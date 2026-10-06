@@ -82,6 +82,7 @@ ipcMain.handle('core:export', (_e, job) => core.request('export', job));
 ipcMain.handle('core:buildSample', (_e, out, kind) => core.request('build', { out, kind }));
 ipcMain.handle('core:audio', (_e, out, links) => core.request('audio', { out, links }));
 ipcMain.handle('core:splitPreview', (_e, source, pieces, seed) => core.request('splitpreview', { source, pieces, seed }));
+ipcMain.handle('core:destructAnim', (_e, pieces, anim, seed) => core.request('destructanim', { pieces, anim, seed }));
 
 ipcMain.handle('dialog:openProp', async () => {
   const r = await dialog.showOpenDialog(win, { title: 'Import GTA prop', properties: ['openFile', 'multiSelections'], filters: PROP_FILTERS });

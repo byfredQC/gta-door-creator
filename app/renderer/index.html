@@ -199,14 +199,28 @@
         <input type="range" id="in-pieces" min="2" max="40" step="1" value="12" />
         <div class="ticks"><span>2</span><span>10</span><span>20</span><span>30</span><span>40</span></div>
         <div class="row2"><button class="btn" id="btn-recut" title="Cut the model in a different way">↻ NEW CUT</button><button class="btn" id="btn-breakprev" title="Play the break">💥 PREVIEW BREAK</button></div>
+        <label class="lbl">How it breaks</label>
+        <div class="seg" id="des-mode"><button data-dm="physics" title="Real GTA physics: explosions, cars and bullets break the pieces off">PHYSICS</button><button data-dm="ycd" title="An explosion animation (.ycd) that loops by itself: intact, explodes, lies on the ground, rebuilds - no script">.YCD ANIMATION</button></div>
+        <div id="des-phys">
         <label class="lbl">Strength <span class="muted">(force needed to break a piece)</span></label>
         <div class="seg four" id="des-strength">
           <button data-ds="fragile" title="50 - breaks with bullets / bumps">FRAGILE</button><button data-ds="normal" title="300 - breaks with cars and explosions">NORMAL</button>
           <button data-ds="solid" title="1500 - needs a big explosion or a heavy vehicle">SOLID</button><button data-ds="verysolid" title="5000 - only very big hits">VERY SOLID</button>
         </div>
+        <label class="check"><input type="checkbox" id="in-anchored" checked /> Anchored <span class="muted">(stays in place until it breaks - bridges, walls)</span></label>
+        </div>
+        <div id="des-ycd">
+          <label class="lbl">Explosion force</label>
+          <div class="seg four" id="des-force"><button data-df="light">LIGHT</button><button data-df="normal">NORMAL</button><button data-df="strong">STRONG</button><button data-df="huge">HUGE</button></div>
+          <label class="lbl">Intact <b id="v-dintact">1.5 s</b> <span class="muted">(before it explodes)</span></label>
+          <input type="range" id="in-dintact" min="0" max="10" step="0.5" value="1.5" />
+          <label class="lbl">On the ground <b id="v-drest">3 s</b></label>
+          <input type="range" id="in-drest" min="0" max="20" step="0.5" value="3" />
+          <label class="lbl">Rebuild <b id="v-drebuild">1.5 s</b> <span class="muted">(pieces fly back)</span></label>
+          <input type="range" id="in-drebuild" min="0.5" max="10" step="0.5" value="1.5" />
+        </div>
         <label class="lbl">Collision of the pieces</label>
         <div class="seg" id="des-col"><button data-dcol="mesh" title="Each piece collides with its real shape - a bridge deck stays walkable at the right height">REAL SHAPE</button><button data-dcol="box" title="One box per piece - lighter, but boxes can stick out (e.g. above railings)">BOXES</button></div>
-        <label class="check"><input type="checkbox" id="in-anchored" checked /> Anchored <span class="muted">(stays in place until it breaks - bridges, walls)</span></label>
         <div class="hint" id="des-info"></div>
       </div>
 

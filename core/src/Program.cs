@@ -28,7 +28,7 @@ namespace DoorCore
             if (args.Length >= 2)
             {
                 var req = new JsonObject { ["id"] = 0, ["cmd"] = args[0] };
-                if (args[0] == "export" || args[0] == "build" || args[0] == "audio" || args[0] == "splitpreview") req = JsonNode.Parse(File.ReadAllText(args[1])).AsObject();
+                if (args[0] == "export" || args[0] == "build" || args[0] == "audio" || args[0] == "splitpreview" || args[0] == "destructanim") req = JsonNode.Parse(File.ReadAllText(args[1])).AsObject();
                 else req["path"] = args[1];
                 if (!req.ContainsKey("cmd")) req["cmd"] = args[0];
                 Console.WriteLine(Handle(req).ToJsonString());
@@ -59,6 +59,7 @@ namespace DoorCore
                     "ping" => new JsonObject { ["pong"] = true },
                     "load" => Loader.Load((string)req["path"]),
                     "splitpreview" => Destruct.Preview(req),
+                    "destructanim" => DestructAnim.Preview(req),
                     "export" => Exporter.Export(req),
                     "build" => TestBuilder.Build(req),
                     "audio" => Audio.Build(req),

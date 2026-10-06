@@ -44,7 +44,7 @@ export function defaultDoor() {
     sound: { mode: 'auto', id: null },
     ytyp: { archetypeName: '', modelName: '', ytypName: '', lodDist: 100, hdTextureDist: 15, flags: FLAG_DYNAMIC | FLAG_DOOR_PHYSICS, flagsAuto: true, textureDictionary: null },
     export: { folder: null, streamYbn: false, withScript: false },
-    destruct: { pieces: 12, seed: 1, strength: 'normal', anchored: true, collision: 'mesh' },
+    destruct: { pieces: 12, seed: 1, strength: 'normal', anchored: true, collision: 'mesh', mode: 'physics', anim: { force: 'normal', intact: 1.5, rest: 3, rebuild: 1.5 } },
     custom: { interp: 'linear', keys: [{ t: 0, r: [0, 0, 0], p: [0, 0, 0] }, { t: 4, r: [0, 0, 360], p: [0, 0, 0] }] },
   };
 }
@@ -194,7 +194,8 @@ export function autoDetect(model, an) {
 
 // ---------------------------------------------------------------- motion
 export const DESTRUCT_STRENGTH = { fragile: 50, normal: 300, solid: 1500, verysolid: 5000 };
-export function duration(door) { if (door.type === 'destruct') return 2.5; return door.type === 'custom' ? customDuration(door) : (SPEEDS[door.type]?.[door.speed] ?? 1.5); }
+export const destructYcd = (door) => door.type === 'destruct' && door.destruct?.mode === 'ycd';
+export function duration(door) { if (door.type === 'destruct') return destructYcd(door) ? (door._desDur || 8) : 2.5; return door.type === 'custom' ? customDuration(door) : (SPEEDS[door.type]?.[door.speed] ?? 1.5); }
 
 // ---------------------------------------------------------------- custom animation (whole object, keyframes)
 // keys: { t seconds, r [x,y,z] degrees (any value, 360 = one turn), p [x,y,z] metres } relative to the pivot
@@ -336,6 +337,7 @@ export function panelLayout(door, an) {
 // ---------------------------------------------------------------- archetype helpers
 export const FLAGS_ANIM_FRAGMENT = 537526816; // vanilla animated fragment (Has Anim + Dynamic + Auto Start Anim + Use Ambient Scale) + Static
 export function recommendedFlags(door) {
+  if (destructYcd(door)) return FLAGS_ANIM_FRAGMENT;   // animated fragment, the clip named like the archetype auto-starts and loops
   if (door.type === 'destruct') return 536870912 + 131072 + (door.destruct?.anchored === false ? 0 : 32); // ambient scale + dynamic (+ static)
   if (door.engine === 'ycd') return FLAGS_ANIM_FRAGMENT;
   return door.engine === 'native' ? (FLAG_DYNAMIC | FLAG_DOOR_PHYSICS) : FLAG_DYNAMIC;

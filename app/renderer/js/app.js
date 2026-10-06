@@ -88,6 +88,12 @@ function updateReadout() {
   const d = S.door, an = S.an;
   if (!S.model || !d.created) { $('pv-readout').textContent = '–'; return; }
   if (d.type === 'destruct') {
+    if (D.destructYcd(d)) {
+      const dur = D.duration(d), t = S.preview.t * dur, da = S.desAnim && S.desAnim.key === desAnimKey() ? S.desAnim : null;
+      const phase = !da ? 'computing…' : t < da.explodeAt ? 'intact' : t < da.landedAt ? 'explosion' : t < da.rebuildAt ? 'on the ground' : 'rebuild';
+      $('pv-readout').textContent = `${t.toFixed(2)} / ${dur.toFixed(2)} s · ${phase} · .ycd loop`;
+      return;
+    }
     $('pv-readout').textContent = `${S.shards?.pieces?.length ?? d.destruct.pieces} pieces · strength ${d.destruct.strength} · break preview`;
     return;
   }
@@ -197,6 +203,7 @@ function archetype() {
     flags: y.flagsAuto ? D.recommendedFlags(d) : Number(y.flags),
     specialAttribute: sa,
     destruct: d.type === 'destruct',
+    desYcd: D.destructYcd(d) ? { dict: D.sanitizeName(y.modelName || d.name) + '_anim', clip: D.sanitizeName(y.archetypeName || d.name) } : null,
     textureDictionary: D.isAnim(d) || d.type === 'destruct' ? '' : (y.textureDictionary ?? (S.model.hasEmbeddedTextures ? D.sanitizeName(y.modelName || d.name) : '')),
     bounds: b,
     anim: !D.isAnim(d) ? null : d.type === 'custom'
@@ -611,7 +618,7 @@ const MODE_TITLES = { door: 'CREATE DOOR', sound: 'DOOR SOUND', anim: 'ANIMATION
 const MODE_PAGES = {
   door: { sub: 'Hinged, sliding or garage door for your MLO / ymap.', steps: ['Import prop', 'Create door', 'Type & side', 'Preview', 'Export'] },
   anim: { sub: 'Make any prop move - it loops by itself in-game, no script.', steps: ['Import prop', 'Preset or keyframes', 'Pivot', '▶ Preview', 'Export'] },
-  destruct: { sub: 'Cut a prop in pieces that break with explosions, cars and bullets.', steps: ['Import prop', 'Pieces & strength', '💥 Preview break', 'Export'] },
+  destruct: { sub: 'Cut a prop in pieces that break with explosions, cars and bullets - or play an explosion loop (.ycd).', steps: ['Import prop', 'Pieces & strength', '💥 Preview break', 'Export'] },
 };
 function setMode(mode) {
   S.mode = mode;
@@ -656,10 +663,45 @@ function refreshDestruct() {
   seg('des-strength', 'ds', ds.strength);
   seg('des-col', 'dcol', ds.collision || 'mesh');
   $('in-anchored').checked = ds.anchored !== false;
+  const ycd = D.destructYcd(d), da0 = ds.anim || (ds.anim = D.defaultDoor().destruct.anim);
+  seg('des-mode', 'dm', ycd ? 'ycd' : 'physics');
+  $('des-phys').style.display = ycd ? 'none' : ''; $('des-ycd').style.display = ycd ? '' : 'none';
+  seg('des-force', 'df', da0.force);
+  for (const [k, id] of [['intact', 'dintact'], ['rest', 'drest'], ['rebuild', 'drebuild']]) {
+    if (document.activeElement !== $('in-' + id)) $('in-' + id).value = da0[k];
+    $('v-' + id).textContent = (+da0[k]).toFixed(1) + ' s';
+  }
   const got = S.shards && S.shards.key === shardKey() ? S.shards : null;
-  $('des-info').innerHTML = (got ? `<b>${got.pieces.length} pieces</b> (${got.triangles.toLocaleString()} triangles after cutting) · ` : 'Cutting… · ') +
-    `strength ${D.DESTRUCT_STRENGTH[ds.strength]}. In-game every piece breaks off by itself when an explosion, a vehicle or bullets hit it hard enough, then falls with real GTA physics - <b>no script</b>. Collision = ${(ds.collision || 'mesh') === 'mesh' ? 'the real shape of every piece' : 'one box per piece'} (material from COLLISION).`;
+  const cut = got ? `<b>${got.pieces.length} pieces</b> (${got.triangles.toLocaleString()} triangles after cutting) · ` : 'Cutting… · ';
+  const colTxt = `Collision = ${(ds.collision || 'mesh') === 'mesh' ? 'the real shape of every piece' : 'one box per piece'} (material from COLLISION)`;
+  if (ycd) {
+    const da = S.desAnim && S.desAnim.key === desAnimKey() ? S.desAnim : null;
+    $('des-info').innerHTML = cut + (da ? `loop of <b>${da.duration.toFixed(1)} s</b> (explodes at ${da.explodeAt.toFixed(1)} s, on the ground at ${da.landedAt.toFixed(1)} s). ` : 'computing the explosion… ') +
+      `Export = <b>.yft + .ycd + .yed + .ytyp</b>: GTA starts the clip by itself and loops it - <b>no script</b>. The collision of every piece follows the animation. ${colTxt}.`;
+    if (got && !da) requestDesAnim();
+  } else {
+    $('des-info').innerHTML = cut + `strength ${D.DESTRUCT_STRENGTH[ds.strength]}. In-game every piece breaks off by itself when an explosion, a vehicle or bullets hit it hard enough, then falls with real GTA physics - <b>no script</b>. ${colTxt}.`;
+    viewer.setDesAnim(null);
+  }
   if (!got) requestShards();
+}
+function desAnimKey() { const ds = S.door.destruct, a = ds.anim || {}; return `${shardKey()}|${a.force}|${a.intact}|${a.rest}|${a.rebuild}`; }
+let desAnimTimer = null;
+function requestDesAnim() {
+  clearTimeout(desAnimTimer);
+  desAnimTimer = setTimeout(async () => {
+    if (!S.model || !D.destructYcd(S.door) || !S.shards || S.shards.key !== shardKey()) return;
+    const key = desAnimKey();
+    if (S.desAnim && S.desAnim.key === key) return;
+    try {
+      const res = await api.destructAnim(S.shards.pieces.map((p) => ({ min: p.min, max: p.max })), S.door.destruct.anim, S.door.destruct.seed);
+      if (key !== desAnimKey()) return;
+      S.desAnim = { key, ...res };
+      S.door._desDur = res.duration;
+      viewer.setDesAnim(res);
+      refreshDestruct(); applyPreview();
+    } catch (e) { toast('Explosion preview failed: ' + e.message, 'err'); }
+  }, 200);
 }
 function shardKey() { return `${S.model?.path}|${S.door.destruct.pieces}|${S.door.destruct.seed}`; }
 function requestShards() {
@@ -673,6 +715,7 @@ function requestShards() {
       if (key !== shardKey()) return;
       S.shards = { key, pieces: res.pieces, triangles: res.triangles };
       viewer.setShards(res.pieces);
+      if (S.desAnim && S.desAnim.key === desAnimKey()) viewer.setDesAnim(S.desAnim);
       refreshDestruct(); updateReadout();
     } catch (e) { toast('Cut failed: ' + e.message, 'err'); }
   }, 250);
@@ -750,12 +793,12 @@ function ytypXml(a) {
    <hdTextureDist value="${f(a.hdTextureDist)}" />
    <name>${a.archetypeName}</name>
    ${a.textureDictionary ? `<textureDictionary>${a.textureDictionary}</textureDictionary>` : '<textureDictionary />'}
-   ${a.anim ? `<clipDictionary>${a.anim.dict}</clipDictionary>` : '<clipDictionary />'}
+   ${a.anim || a.desYcd ? `<clipDictionary>${(a.anim || a.desYcd).dict}</clipDictionary>` : '<clipDictionary />'}
    <drawableDictionary />
    <physicsDictionary>${a.archetypeName}</physicsDictionary>
    <assetType>${a.anim || a.destruct ? 'ASSET_TYPE_FRAGMENT' : 'ASSET_TYPE_DRAWABLE'}</assetType>
    <assetName>${a.modelName}</assetName>
-   ${a.anim ? `<extensions>
+   ${a.anim || a.desYcd ? `<extensions>
     <Item type="CExtensionDefExpression">
      <name>${a.modelName}</name>
      <offsetPosition x="0" y="0" z="0" />
@@ -780,6 +823,8 @@ function fxmanifestLines() {
   if (!S.model || !S.door.created) return '';
   const a = archetype();
   if (a.destruct) {
+    if (a.desYcd) return `-- GTA Door Creator : ${a.archetypeName} (destruct .ycd, explosion loop by itself)\n-- stream/${a.modelName}.yft + ${a.desYcd.dict}.ycd + ${a.modelName}.yed + ${a.ytypName}.ytyp\n` +
+      `data_file 'DLC_ITYP_REQUEST' 'stream/${a.ytypName}.ytyp'\n`;
     return `-- GTA Door Creator : ${a.archetypeName} (destructible, breaks by itself)\n-- stream/${a.modelName}.yft + ${a.ytypName}.ytyp\n` +
       `data_file 'DLC_ITYP_REQUEST' 'stream/${a.ytypName}.ytyp'\n`;
   }
@@ -814,7 +859,7 @@ function refreshYtyp() {
   const a = archetype(), d = S.door, y = d.ytyp;
   const setVal = (id, v) => { if (document.activeElement !== $(id)) $(id).value = v; };
   setVal('y-arch', a.archetypeName); setVal('y-model', a.modelName); setVal('y-file', a.ytypName + '.ytyp');
-  $('y-type').value = a.destruct ? 'Destructible fragment' : a.anim ? 'Animated fragment (.ycd)' : `Door · ${D.SPECIAL_ATTR_NAMES[a.specialAttribute]} (${a.specialAttribute})`;
+  $('y-type').value = a.desYcd ? 'Destruct animation (.ycd)' : a.destruct ? 'Destructible fragment' : a.anim ? 'Animated fragment (.ycd)' : `Door · ${D.SPECIAL_ATTR_NAMES[a.specialAttribute]} (${a.specialAttribute})`;
   const b = a.bounds;
   $('y-bounds').value = `${D.fmt(b.max[0] - b.min[0], 2)} × ${D.fmt(b.max[1] - b.min[1], 2)} × ${D.fmt(b.max[2] - b.min[2], 2)}`;
   $('y-center').value = `${D.fmt(b.center[0])}, ${D.fmt(b.center[1])}, ${D.fmt(b.center[2])}`;
@@ -841,7 +886,9 @@ ${K('Name:')}
 ${K('Model:')}
    ${V(a.modelName)}${a.anim || a.destruct ? '.yft' : '.ydr'}
 ${K('Type:')}
-   ${a.destruct ? `${V('Destructible fragment')} <span class="h">· ${S.door.destruct.pieces} pieces · strength ${D.DESTRUCT_STRENGTH[S.door.destruct.strength]}${S.door.destruct.anchored === false ? '' : ' · anchored'}</span>` : a.anim ? `${V('Animated fragment')} <span class="h">· ASSET_TYPE_FRAGMENT · expression ${esc(a.modelName)}</span>
+   ${a.desYcd ? `${V('Destruct animation (.ycd)')} <span class="h">· ${S.door.destruct.pieces} pieces · expression ${esc(a.modelName)}</span>
+${K('Clips:')}
+   ${V(a.desYcd.dict)}.ycd <span class="h">→ ${esc(a.desYcd.clip)} (auto start, loops - no script)</span>` : a.destruct ? `${V('Destructible fragment')} <span class="h">· ${S.door.destruct.pieces} pieces · strength ${D.DESTRUCT_STRENGTH[S.door.destruct.strength]}${S.door.destruct.anchored === false ? '' : ' · anchored'}</span>` : a.anim ? `${V('Animated fragment')} <span class="h">· ASSET_TYPE_FRAGMENT · expression ${esc(a.modelName)}</span>
 ${K('Clips:')}
    ${V(a.anim.dict)}.ycd <span class="h">→ ${a.anim.auto ? esc(a.anim.clip) + ' (auto start, loops - no script)' : esc(a.anim.open) + ' / ' + esc(a.anim.close)}</span>` : `${V('Door')} <span class="h">· specialAttribute ${a.specialAttribute} (${D.SPECIAL_ATTR_NAMES[a.specialAttribute]})</span>`}
 ${K('Bounds:')}  <span class="h">min → max</span>
@@ -884,6 +931,11 @@ function refreshExport() {
   const n = a ? a.modelName : 'my_door';
   const col = d.collision.mode !== 'none';
   if (d.type === 'destruct') {
+    if (D.destructYcd(d)) {
+      $('fivem-tree').textContent = `${n}/ stream/{${n}.yft, ${n}_anim.ycd, ${n}.yed, ${a ? a.ytypName : n}.ytyp} · fxmanifest.lua · no script (explosion loop)`;
+      $('ex-ydr').textContent = 'EXPORT YFT+YCD'; $('ex-ybn').disabled = true;
+      return;
+    }
     $('fivem-tree').textContent = `${n}/ stream/{${n}.yft, ${a ? a.ytypName : n}.ytyp} · fxmanifest.lua · no script (breaks with explosions / impacts)`;
     $('ex-ydr').textContent = 'EXPORT YFT'; $('ex-ybn').disabled = true;
     return;
@@ -917,7 +969,8 @@ function exportJob(outDir, outputs) {
       flags: a.flags, specialAttribute: a.specialAttribute, textureDictionary: a.textureDictionary, physicsDictionary: a.archetypeName,
       mergeInto: a.mergePath || undefined,
     },
-    destruct: a.destruct ? { pieces: S.door.destruct.pieces, seed: S.door.destruct.seed, strength: D.DESTRUCT_STRENGTH[S.door.destruct.strength], anchored: S.door.destruct.anchored !== false, collision: S.door.destruct.collision || 'mesh' } : undefined,
+    destruct: a.destruct ? { pieces: S.door.destruct.pieces, seed: S.door.destruct.seed, strength: D.DESTRUCT_STRENGTH[S.door.destruct.strength], anchored: S.door.destruct.anchored !== false, collision: S.door.destruct.collision || 'mesh',
+      anim: D.destructYcd(S.door) ? { on: true, ...S.door.destruct.anim, dict: a.modelName + '_anim' } : undefined } : undefined,
     anim: a.anim ? (() => {
       if (a.anim.auto) return { dict: a.anim.dict, samples: D.customSamples(S.door) };
       const ms = D.motionSpec(S.door, S.an, pivot());
@@ -935,7 +988,8 @@ async function doExport(outputs, label) {
     for (const f of res.files) log(`  ✓ ${f}`, 'ok');
     if (archetype().mergePath) log(`  ⚠ ${archetype().ytypName}.ytyp = YOUR ytyp + this prop. Use it in place of your original (MLO resource) - never stream both. A .bak copy of your file was kept.`, 'w');
     if (outputs.ydr && outputs.ytyp && S.door.type === 'destruct') {
-      log('  ⧉ Put the .yft + .ytyp in stream/ + the data_file line (COPY FXMANIFEST): it breaks by itself, no script', 'w');
+      log(D.destructYcd(S.door) ? '  ⧉ Put these 4 files in stream/ + the data_file line (COPY FXMANIFEST): the explosion loops by itself, no script'
+        : '  ⧉ Put the .yft + .ytyp in stream/ + the data_file line (COPY FXMANIFEST): it breaks by itself, no script', 'w');
     } else if (outputs.ydr && outputs.ytyp && D.isAnim(S.door)) {
       log(S.door.type === 'custom' ? '  ⧉ Put these 4 files in stream/ + the data_file line (COPY FXMANIFEST): the animation loops by itself, no script' : '  ⧉ Put these 4 files in stream/ and use EXPORT FIVEM RESOURCE for the Lua that plays the clips', 'w');
     } else if (outputs.ydr && outputs.ytyp) {
@@ -987,12 +1041,13 @@ async function exportFiveM() {
         log(`  ✓ collision/${b}  (not streamed - collision is embedded in the .ydr)`, 'ok');
       } else { streamFiles.push(b); log(`  ✓ stream/${b}`, 'ok'); }
     }
-    if (destruct) log(`  ✓ ${res.archetype?.pieces ?? ''} breakable pieces, one collision box each`, 'ok');
+    if (destruct && D.destructYcd(S.door)) log(`  ✓ ${res.archetype?.pieces ?? ''} pieces · explosion loop ${res.archetype?.duration ?? ''} s (.ycd) · collision follows the pieces (.yed)`, 'ok');
+    else if (destruct) log(`  ✓ ${res.archetype?.pieces ?? ''} breakable pieces, one collision box each`, 'ok');
     else if (anim) log('  ✓ collision follows the animation (fragment + expression)', 'ok');
     else if (S.door.collision.mode !== 'none') log('  ✓ collision embedded in ' + a.modelName + '.ydr', 'ok');
     const audio = anim || destruct ? null : await writeAudio(joinPath(root, 'audio'), a);
     if (audio) log(`  ✓ audio/${audio.file}  (sound: ${audio.label})`, 'ok');
-    const files = buildResource({ door: S.door, an: S.an, pivot: pivot(), resourceName: resName, ytypFile: a.ytypName + '.ytyp', streamFiles, withScript, anim: a.anim, destruct: destruct ? { pieces: res.archetype?.pieces ?? S.door.destruct.pieces, strength: D.DESTRUCT_STRENGTH[S.door.destruct.strength], anchored: S.door.destruct.anchored !== false } : null, modelName: a.modelName, audioFile: audio && audio.file, soundLabel: audio && audio.label });
+    const files = buildResource({ door: S.door, an: S.an, pivot: pivot(), resourceName: resName, ytypFile: a.ytypName + '.ytyp', streamFiles, withScript, anim: a.anim, destruct: destruct ? { pieces: res.archetype?.pieces ?? S.door.destruct.pieces, strength: D.DESTRUCT_STRENGTH[S.door.destruct.strength], anchored: S.door.destruct.anchored !== false, ycd: D.destructYcd(S.door) ? { dict: res.archetype?.dict, clip: res.archetype?.clips?.[0], duration: res.archetype?.duration, explodeAt: res.archetype?.explodeAt } : null } : null, modelName: a.modelName, audioFile: audio && audio.file, soundLabel: audio && audio.label });
     for (const [fname, text] of Object.entries(files)) { await api.writeText(joinPath(root, fname), text); log(`  ✓ ${fname}`, 'ok'); }
     if (archetype().mergePath) log(`  ⚠ ${archetype().ytypName}.ytyp = YOUR ytyp + this prop. Use it in place of your original (MLO resource) - never stream both. A .bak copy of your file was kept.`, 'w');
     for (const w of res.warnings || []) log(`  ! ${w}`, 'w');
@@ -1251,6 +1306,10 @@ function bind() {
   $$('[data-ds]').forEach((b) => b.onclick = () => { S.door.destruct.strength = b.dataset.ds; touch(); });
   $$('[data-dcol]').forEach((b) => b.onclick = () => { S.door.destruct.collision = b.dataset.dcol; touch(); });
   $('in-anchored').onchange = () => { S.door.destruct.anchored = $('in-anchored').checked; touch(); };
+  $$('[data-dm]').forEach((b) => b.onclick = () => { S.door.destruct.mode = b.dataset.dm; S.preview.t = 0; touch(); });
+  $$('[data-df]').forEach((b) => b.onclick = () => { S.door.destruct.anim.force = b.dataset.df; touch(); });
+  for (const [k, id] of [['intact', 'dintact'], ['rest', 'drest'], ['rebuild', 'drebuild']])
+    $('in-' + id).oninput = () => { S.door.destruct.anim[k] = +$('in-' + id).value; $('v-' + id).textContent = (+$('in-' + id).value).toFixed(1) + ' s'; touch(); };
 
   // custom animation
   $$('[data-ap]').forEach((b) => b.onclick = () => { S.door.custom = JSON.parse(JSON.stringify(D.ANIM_PRESETS[b.dataset.ap])); S.preview.t = 0; touch(); refreshCustom(true); play(); });

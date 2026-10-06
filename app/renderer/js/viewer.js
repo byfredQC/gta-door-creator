@@ -375,6 +375,11 @@ export class Viewer {
     this.applyShardVisibility();
     this.setOpen(this.t);
   }
+  // baked explosion (.ycd mode): per piece, frames of [ox, oy, oz, qx, qy, qz, qw] computed by the engine (same as the export)
+  setDesAnim(res) {
+    this.desAnim = res ? { fps: res.fps, frames: res.frames, tracks: res.tracks.map((t) => b64ToF32(t)) } : null;
+    this.setOpen(this.t);
+  }
   applyShardVisibility() {
     const on = !!(this.door && this.door.created && this.door.type === 'destruct' && this.shards.length);
     this.shardGroup.visible = on;
@@ -411,6 +416,17 @@ export class Viewer {
           .multiply(new THREE.Matrix4().makeTranslation(-B.x, -B.y, -B.z));
         p.group.matrix.copy(m);
       }
+      return;
+    }
+    if (door.type === 'destruct' && door.destruct?.mode === 'ycd' && this.desAnim && this.desAnim.tracks.length === this.shards.length) {
+      const A = this.desAnim, fr = Math.min(A.frames - 1, t * (A.frames - 1)), f0 = Math.floor(fr), f1 = Math.min(A.frames - 1, f0 + 1), u = fr - f0;
+      const qa = new THREE.Quaternion(), qb = new THREE.Quaternion();
+      this.shards.forEach((s, i) => {
+        const d = A.tracks[i], a = f0 * 7, b = f1 * 7;
+        s.outer.position.set(s.center.x + d[a] + (d[b] - d[a]) * u, s.center.y + d[a + 1] + (d[b + 1] - d[a + 1]) * u, s.center.z + d[a + 2] + (d[b + 2] - d[a + 2]) * u);
+        qa.set(d[a + 3], d[a + 4], d[a + 5], d[a + 6]); qb.set(d[b + 3], d[b + 4], d[b + 5], d[b + 6]);
+        s.outer.quaternion.copy(qa).slerp(qb, u);
+      });
       return;
     }
     if (door.type === 'destruct') {

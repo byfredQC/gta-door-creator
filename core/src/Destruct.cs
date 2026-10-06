@@ -198,7 +198,7 @@ namespace DoorCore
                         if (uv.Count > 0) part["uvs"] = Util.B64(uv.ToArray());
                         parts.Add(part);
                     }
-                    outPieces.Add(new JsonObject { ["center"] = Util.V3((mn + mx) * 0.5f), ["parts"] = parts });
+                    outPieces.Add(new JsonObject { ["center"] = Util.V3((mn + mx) * 0.5f), ["min"] = Util.V3(mn), ["max"] = Util.V3(mx), ["parts"] = parts });
                 }
                 return new JsonObject { ["pieces"] = outPieces, ["triangles"] = geos.Sum(g => g.I.Count / 3) };
             }
@@ -222,6 +222,17 @@ namespace DoorCore
             bool meshCol = ((string)ds["collision"] ?? "mesh") == "mesh";
             int mat = (int?)col["material"] ?? 70;
             int pieceReq = Math.Max(2, Math.Min(120, (int?)ds["pieces"] ?? 12)), seed = (int?)ds["seed"] ?? 1;
+            // .ycd mode: the pieces play a baked explosion clip in a loop instead of breaking with physics
+            var danim = ds["anim"] as JsonObject;
+            bool animOn = danim != null && ((bool?)danim["on"] ?? true);
+            DestructAnim.Sim sim = null; string dict = null, clip = null;
+            if (animOn)
+            {
+                clip = Exporter.San((string)y["archetypeName"] ?? name);          // auto start plays the clip named like the archetype
+                dict = Exporter.San((string)danim["dict"] ?? (name + "_anim"));
+                if (dict == clip) dict = clip + "_anim";
+                strength = -1f;                                                  // animated, never breaks by physics
+            }
             Directory.CreateDirectory(outDir);
             var warnings = new JsonArray();
             var files = new JsonArray();
@@ -269,6 +280,8 @@ namespace DoorCore
                 foreach (var pc in list) while (!used.Add(pc.Tag)) pc.Tag = (ushort)(pc.Tag % 65000 + 1);
                 if (list.Count > 120) throw new Exception("Too many pieces (max 120)");
                 pieceCount = list.Count;
+                var boxes = list.Select(p => (p.Min, p.Max)).ToList();
+                if (animOn) sim = DestructAnim.Simulate(boxes, danim, seed);
 
                 // ---- new high models: one per piece, vertices in the piece bone space
                 var sbm = new StringBuilder("<DrawableModelsHigh>");
@@ -306,7 +319,7 @@ namespace DoorCore
                 var mdoc = new XmlDocument(); mdoc.LoadXml(sbm.ToString());
                 var mEl = ddoc.CreateElement("Matrix"); mEl.InnerText = Animated.Mat43(Vector3.Zero);
                 dr.InsertAfter(mEl, dr.SelectSingleNode("Name"));
-                var skDoc = new XmlDocument(); skDoc.LoadXml(SkeletonXml(name, list));
+                var skDoc = new XmlDocument(); skDoc.LoadXml(SkeletonXml(name, list, animOn));
                 var sg = dr.SelectSingleNode("ShaderGroup");
                 var skel = ddoc.ImportNode(skDoc.DocumentElement, true);
                 if (sg != null) dr.InsertAfter(skel, sg); else dr.InsertAfter(skel, mEl);
@@ -314,6 +327,7 @@ namespace DoorCore
 
                 bbMin = list.Select(p => p.Min).Aggregate(Vector3.Min); bbMax = list.Select(p => p.Max).Aggregate(Vector3.Max);
                 bbMin = Vector3.Min(bbMin, new Vector3(-0.02f)); bbMax = Vector3.Max(bbMax, new Vector3(0.02f));
+                if (sim != null) { var (sa, sb2) = DestructAnim.Swept(boxes, sim); bbMin = Vector3.Min(bbMin, sa); bbMax = Vector3.Max(bbMax, sb2); }
                 var sc = (bbMin + bbMax) * 0.5f; var sr = (bbMax - bbMin).Length() * 0.5f;
                 void Set(string t, string at, string v) { (dr.SelectSingleNode(t) as XmlElement)?.SetAttribute(at, v); }
                 Set("BoundingSphereCenter", "x", F(sc.X)); Set("BoundingSphereCenter", "y", F(sc.Y)); Set("BoundingSphereCenter", "z", F(sc.Z));
@@ -330,7 +344,24 @@ namespace DoorCore
                     File.WriteAllBytes(yftPath, yftBytes);
                     files.Add(yftPath);
                     if ((bool?)req["writeXml"] ?? false) File.WriteAllText(yftPath + ".xml", fragXml);
-                    Verify(yftBytes, list.Count);
+                    Verify(yftBytes, list.Count, animOn);
+
+                    if (sim != null)
+                    {
+                        var tags = list.Select(p => p.Tag).ToArray(); var centres = list.Select(p => p.Center).ToArray();
+                        var ycdXml = DestructAnim.BuildYcdXml(clip, tags, centres, sim);
+                        var cdoc = new XmlDocument(); cdoc.LoadXml(ycdXml);
+                        var ycdBytes = XmlMeta.GetYcdData(cdoc) ?? throw new Exception("YCD build failed");
+                        var ycdPath = Path.Combine(outDir, dict + ".ycd");
+                        File.WriteAllBytes(ycdPath, ycdBytes); files.Add(ycdPath);
+                        if ((bool?)req["writeXml"] ?? false) File.WriteAllText(ycdPath + ".xml", ycdXml);
+                        var yedXml = DestructAnim.BuildYedXml(name, tags);
+                        var edoc = new XmlDocument(); edoc.LoadXml(yedXml);
+                        var yedBytes = XmlMeta.GetYedData(edoc, "") ?? throw new Exception("YED build failed");
+                        var yedPath = Path.Combine(outDir, name + ".yed");
+                        File.WriteAllBytes(yedPath, yedBytes); files.Add(yedPath);
+                        DestructAnim.Verify(ycdBytes, yedBytes, clip, name, tags, centres, sim);
+                    }
                 }
             }
             finally { try { Directory.Delete(texDir, true); } catch { } }
@@ -341,16 +372,18 @@ namespace DoorCore
             {
                 var ytypName = Exporter.San((string)y["ytypName"] ?? name);
                 var arch = Exporter.San((string)y["archetypeName"] ?? name);
-                uint flags = (uint?)y["flags"] ?? (FlagsBreakable | (anchored ? FlagStatic : 0));
-                var xml = YtypXml(ytypName, arch, name, y, flags, bbMin, bbMax, centre, radius);
+                uint flags = animOn ? Animated.FragFlags : (uint?)y["flags"] ?? (FlagsBreakable | (anchored ? FlagStatic : 0));
+                var xml = YtypXml(ytypName, arch, name, y, flags, bbMin, bbMax, centre, radius, dict);
                 var (data, outName) = YtypMerge.Build(xml, ytypName, y, warnings);
                 var p = Path.Combine(outDir, outName + ".ytyp");
                 File.WriteAllBytes(p, data);
                 files.Add(p);
                 ytypOut = outName + ".ytyp";
+                if (animOn) Animated.VerifyYtyp(data, arch, name, dict, warnings);
             }
             var info = new JsonObject { ["bbMin"] = Util.V3(bbMin), ["bbMax"] = Util.V3(bbMax), ["bsCentre"] = Util.V3(centre), ["bsRadius"] = Util.R(radius), ["pieces"] = pieceCount };
             if (ytypOut != null) info["ytypFile"] = ytypOut;
+            if (sim != null) { info["dict"] = dict; info["clips"] = new JsonArray(clip); info["duration"] = Util.R(sim.Duration); info["autoStart"] = true; info["explodeAt"] = Util.R(sim.ExplodeAt); }
             return new JsonObject { ["files"] = files, ["archetype"] = info, ["warnings"] = warnings };
         }
 
@@ -368,10 +401,10 @@ namespace DoorCore
             if (g.SelectSingleNode(tag) is XmlElement e) { e.SetAttribute("x", F(v.X)); e.SetAttribute("y", F(v.Y)); e.SetAttribute("z", F(v.Z)); }
         }
 
-        static string SkeletonXml(string name, List<Piece> list)
+        static string SkeletonXml(string name, List<Piece> list, bool animated)
         {
             const string rootFlags = "RotX, RotY, RotZ, TransX, TransY, TransZ, Unk0";
-            const string pieceFlags = "RotX, RotY, RotZ, Unk0";
+            string pieceFlags = animated ? "RotX, RotY, RotZ, TransX, TransY, TransZ, ScaleX, ScaleY, ScaleZ" : "RotX, RotY, RotZ, Unk0";
             var sb = new StringBuilder();
             var s50 = new StringBuilder($"0 {rootFlags}"); var s58 = new StringBuilder($"0 {rootFlags} 0 0 0");
             string bone(string n, int t, int idx, int parent, int sibling, string flags, Vector3 tr) =>
@@ -462,7 +495,7 @@ namespace DoorCore
             for (int i = 1; i < bodies.Count; i++) sb.Append(Group($"piece_{i:000}", 0, strength, bodies[i].mass));
             sb.Append("   </Groups>\n   <Children>\n");
             foreach (var b in bodies)
-                sb.Append(Child(b.group, b.tag, b.mass, b.group == 0 ? 400f : strength, Animated.BoxInertia(b.mx - b.mn, b.mass), (b.mn + b.mx) * 0.5f - b.bone));
+                sb.Append(Child(b.group, b.tag, b.mass, b.group == 0 ? 400f : strength < 0 ? float.MaxValue : strength, Animated.BoxInertia(b.mx - b.mn, b.mass), (b.mn + b.mx) * 0.5f - b.bone));
             sb.Append("   </Children>\n  </LOD1>\n </Physics>\n <Lights />\n</Fragment>\n");
             return sb.ToString();
         }
@@ -509,7 +542,7 @@ namespace DoorCore
         }
         static string V2(string t, Vector3 v) => Animated.V(t, v);
 
-        static string YtypXml(string ytypName, string arch, string model, JsonObject y, uint flags, Vector3 bbMin, Vector3 bbMax, Vector3 centre, float radius)
+        static string YtypXml(string ytypName, string arch, string model, JsonObject y, uint flags, Vector3 bbMin, Vector3 bbMax, Vector3 centre, float radius, string dict = null)
         {
             float lod = (float?)y["lodDist"] ?? Math.Max(200f, radius * 20f);
             float hd = (float?)y["hdTextureDist"] ?? 15f;
@@ -518,14 +551,23 @@ namespace DoorCore
             sb.Append($"   <lodDist value=\"{F(lod)}\" />\n   <flags value=\"{flags}\" />\n   <specialAttribute value=\"0\" />\n");
             sb.Append("   " + V("bbMin", bbMin) + "\n   " + V("bbMax", bbMax) + "\n   " + V("bsCentre", centre) + "\n");
             sb.Append($"   <bsRadius value=\"{F(radius)}\" />\n   <hdTextureDist value=\"{F(hd)}\" />\n");
-            sb.Append($"   <name>{arch}</name>\n   <textureDictionary />\n   <clipDictionary />\n   <drawableDictionary />\n");
-            sb.Append($"   <physicsDictionary>{arch}</physicsDictionary>\n   <assetType>ASSET_TYPE_FRAGMENT</assetType>\n   <assetName>{model}</assetName>\n   <extensions />\n");
+            sb.Append($"   <name>{arch}</name>\n   <textureDictionary />\n   " + (dict == null ? "<clipDictionary />" : $"<clipDictionary>{dict}</clipDictionary>") + "\n   <drawableDictionary />\n");
+            sb.Append($"   <physicsDictionary>{arch}</physicsDictionary>\n   <assetType>ASSET_TYPE_FRAGMENT</assetType>\n   <assetName>{model}</assetName>\n");
+            if (dict == null) sb.Append("   <extensions />\n");
+            else
+            {
+                // expression with bare names: the collision of every piece follows its bone
+                sb.Append("   <extensions>\n    <Item type=\"CExtensionDefExpression\">\n");
+                sb.Append($"     <name>{model}</name>\n     <offsetPosition x=\"0\" y=\"0\" z=\"0\" />\n");
+                sb.Append($"     <expressionDictionaryName>{model}</expressionDictionaryName>\n     <expressionName>{model}</expressionName>\n");
+                sb.Append("     <creatureMetadataName />\n     <initialiseOnCollision value=\"false\" />\n    </Item>\n   </extensions>\n");
+            }
             sb.Append("  </Item>\n </archetypes>\n");
             sb.Append($" <name>{ytypName}</name>\n <dependencies />\n <compositeEntityTypes />\n</CMapTypes>\n");
             return sb.ToString();
         }
 
-        static void Verify(byte[] yft, int pieces)
+        static void Verify(byte[] yft, int pieces, bool animated = false)
         {
             var f = new YftFile(); RpfFile.LoadResourceFile(f, yft, 162);
             var lod = f.Fragment?.PhysicsLODGroup?.PhysicsLOD1;
@@ -534,7 +576,7 @@ namespace DoorCore
             if (bones == null || bones.Length != pieces + 1) throw new Exception("YFT check failed: skeleton");
             if (models == null || models.Length != pieces) throw new Exception("YFT check failed: piece models");
             var groups = lod?.Groups?.data_items; var children = lod?.Children?.data_items;
-            if (groups == null || groups.Length != pieces + 1 || groups[0].ParentIndex != 255 || groups.Skip(1).Any(g => g.ParentIndex != 0 || g.Strength <= 0)) throw new Exception("YFT check failed: groups");
+            if (groups == null || groups.Length != pieces + 1 || groups[0].ParentIndex != 255 || groups.Skip(1).Any(g => g.ParentIndex != 0 || (g.Strength <= 0 && !animated))) throw new Exception("YFT check failed: groups");
             if (children == null || children.Length != pieces + 1) throw new Exception("YFT check failed: children");
             for (int i = 1; i < children.Length; i++)
                 if (children[i].GroupIndex != i || children[i].BoneTag != bones[i].Tag) throw new Exception("YFT check failed: child " + i);

@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('api', {
   buildSample: inv('core:buildSample'),
   buildAudio: inv('core:audio'),
   splitPreview: inv('core:splitPreview'),
+  destructAnim: inv('core:destructAnim'),
   openPropDialog: inv('dialog:openProp'),
   openYbnDialog: inv('dialog:openYbn'),
   openYtypDialog: inv('dialog:openYtyp'),
