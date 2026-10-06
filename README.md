@@ -16,9 +16,10 @@
 
 ## Download & install (plug and play)
 
-1. Go to **[Releases](../../releases/latest)** and download **`GTA-Door-Creator-Setup-x.y.z.exe`**.
-2. Run it — the app installs, puts a shortcut on your desktop and opens.
-   *(Portable version: download the `.zip`, unzip, run `GTA Door Creator.exe`.)*
+1. Go to **[Releases](../../releases/latest)** and download one file:
+   - **`GTA-Door-Creator-x.y.z.exe`** — **single .exe, nothing to install**: put it anywhere and double-click it.
+   - or **`GTA-Door-Creator-Setup-x.y.z.exe`** — installer (start menu + desktop shortcut).
+   - or the `.zip` portable folder.
 
 Nothing else to install: the release build includes everything (no .NET, no Blender, no CodeWalker needed).
 
@@ -113,8 +114,8 @@ or just run `build-windows.bat`. Dev mode: `npm run build:core` then `npm start`
 The GitHub Action in `.github/workflows/release.yml` builds everything on Windows and attaches the installer + zip to a Release when you push a tag:
 
 ```bash
-git tag v1.6.0
-git push origin v1.6.0
+git tag v1.10.1
+git push origin v1.10.1
 ```
 
 ### Project layout
