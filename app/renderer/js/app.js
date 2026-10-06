@@ -607,10 +607,18 @@ document.addEventListener('click', (e) => {
 // ------------------------------------------------------------------ HOME
 function showHome(on = true) { $('home').classList.toggle('hidden', !on); if (on) { $('so-modal').classList.add('hidden'); } }
 const MODE_TITLES = { door: 'CREATE DOOR', sound: 'DOOR SOUND', anim: 'ANIMATION', destruct: 'DESTRUCT' };
+const MODE_PAGES = {
+  door: { sub: 'Hinged, sliding or garage door for your MLO / ymap.', steps: ['Import prop', 'Create door', 'Type & side', 'Preview', 'Export'] },
+  anim: { sub: 'Make any prop move - it loops by itself in-game, no script.', steps: ['Import prop', 'Preset or keyframes', 'Pivot', '▶ Preview', 'Export'] },
+  destruct: { sub: 'Cut a prop in pieces that break with explosions, cars and bullets.', steps: ['Import prop', 'Pieces & strength', '💥 Preview break', 'Export'] },
+};
 function setMode(mode) {
   S.mode = mode;
   document.body.dataset.mode = mode || '';
   $('page-title').textContent = MODE_TITLES[mode] || '';
+  $('pv-title').textContent = mode === 'anim' ? 'ANIMATION PREVIEW' : mode === 'destruct' ? 'BREAK PREVIEW' : 'DOOR PREVIEW';
+  const pg = MODE_PAGES[mode];
+  if (pg) { $('pb-title').textContent = MODE_TITLES[mode]; $('pb-sub').textContent = pg.sub; $('pb-steps').innerHTML = pg.steps.map((x) => `<li>${esc(x)}</li>`).join(''); }
   $('so-modal').classList.toggle('as-page', mode === 'sound');
   $('so-close').textContent = mode === 'sound' ? '← Home' : 'Close';
   // a model already loaded follows the page: door types on the door page, custom / destruct on theirs
