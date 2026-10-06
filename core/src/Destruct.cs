@@ -33,6 +33,7 @@ namespace DoorCore
             public ushort Tag;
             public Vector3 Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue);
             public Vector3 Center => (Min + Max) * 0.5f;
+            public List<Vector3> Tris = new();   // collision triangles (pivot space)
             public List<Part> Parts = new();
         }
         class Part { public XmlElement Geom; public List<string> Rows = new(); public List<string[]> Src = new(); public List<int> Idx = new(); public int Shader; public Dictionary<int, int> Map; }
@@ -218,6 +219,7 @@ namespace DoorCore
             float strength = Math.Max(1f, (float?)ds["strength"] ?? 300f);
             float density = Math.Max(50f, (float?)ds["density"] ?? 800f);
             bool anchored = (bool?)ds["anchored"] ?? true;
+            bool meshCol = ((string)ds["collision"] ?? "mesh") == "mesh";
             int mat = (int?)col["material"] ?? 70;
             int pieceReq = Math.Max(2, Math.Min(120, (int?)ds["pieces"] ?? 12)), seed = (int?)ds["seed"] ?? 1;
             Directory.CreateDirectory(outDir);
@@ -256,6 +258,7 @@ namespace DoorCore
                             part.Idx.Add(ni);
                             var p = P(g.V[vi]) - pivot;
                             pc.Min = Vector3.Min(pc.Min, p); pc.Max = Vector3.Max(pc.Max, p);
+                            pc.Tris.Add(p);
                         }
                     }
                 }
@@ -320,7 +323,7 @@ namespace DoorCore
 
                 if (wantModel)
                 {
-                    var fragXml = FragmentXml(name, dr.OuterXml, list, mat, strength, density, sc, sr);
+                    var fragXml = FragmentXml(name, dr.OuterXml, list, mat, strength, density, sc, sr, meshCol);
                     var fdoc = new XmlDocument(); fdoc.LoadXml(fragXml);
                     var yftBytes = XmlMeta.GetYftData(fdoc, texDir) ?? throw new Exception("YFT build failed");
                     var yftPath = Path.Combine(outDir, name + ".yft");
@@ -395,7 +398,7 @@ namespace DoorCore
             $"<Drawable><Name /><Matrix>{Animated.Mat43(matrixPos)}</Matrix><BoundingSphereCenter x=\"0\" y=\"0\" z=\"0\" /><BoundingSphereRadius value=\"0\" /><BoundingBoxMin x=\"0\" y=\"0\" z=\"0\" /><BoundingBoxMax x=\"0\" y=\"0\" z=\"0\" />" +
             "<LodDistHigh value=\"0\" /><LodDistMed value=\"0\" /><LodDistLow value=\"0\" /><LodDistVlow value=\"0\" /><FlagsHigh value=\"0\" /><FlagsMed value=\"0\" /><FlagsLow value=\"0\" /><FlagsVlow value=\"0\" /></Drawable></Item>\n";
 
-        static string FragmentXml(string name, string drawableXml, List<Piece> list, int mat, float strength, float density, Vector3 sc, float sr)
+        static string FragmentXml(string name, string drawableXml, List<Piece> list, int mat, float strength, float density, Vector3 sc, float sr, bool meshCol)
         {
             // bodies: root anchor + one box per piece (model space)
             var bodies = new List<(Vector3 mn, Vector3 mx, float mass, int group, int tag, Vector3 bone)>();
@@ -407,7 +410,7 @@ namespace DoorCore
                 // keep boxes at least 2 cm thick
                 for (int k = 0; k < 3; k++) if (s[k] < 0.02f) { mn[k] -= 0.01f; mx[k] += 0.01f; }
                 s = mx - mn;
-                float mass = Math.Max(1f, Math.Min(20000f, s.X * s.Y * s.Z * density * 0.6f));
+                float mass = Math.Max(1f, Math.Min(5000f, s.X * s.Y * s.Z * density * 0.25f));   // pieces are shells, not solid blocks
                 bodies.Add((mn, mx, mass, pc.Index + 1, pc.Tag, pc.Center));
             }
             float total = bodies.Sum(b => b.mass);
@@ -444,7 +447,12 @@ namespace DoorCore
             sb.Append(V("BoxMin", bMin)).Append(V("BoxMax", bMax)).Append(V("BoxCenter", bc)).Append(V("SphereCenter", com));
             sb.Append($"<SphereRadius value=\"{F((bMax - bMin).Length() * 0.5f + (com - bc).Length())}\" /><Margin value=\"0\" /><Volume value=\"{F(vol)}\" />");
             sb.Append("<Inertia x=\"1\" y=\"1\" z=\"1\" /><MaterialIndex value=\"0\" /><MaterialColourIndex value=\"0\" /><ProceduralID value=\"0\" /><RoomID value=\"0\" /><PedDensity value=\"0\" /><UnkFlags value=\"0\" /><PolyFlags value=\"0\" /><UnkType value=\"2\" /><Children>");
-            foreach (var b in bodies) sb.Append(Animated.BoxChild(b.mn, b.mx, mat));
+            for (int bi = 0; bi < bodies.Count; bi++)
+            {
+                var b = bodies[bi];
+                string geo = bi > 0 && meshCol ? GeometryChild(list[bi - 1].Tris, mat) : null;
+                sb.Append(geo ?? Animated.BoxChild(b.mn, b.mx, mat));
+            }
             sb.Append("</Children></Bounds>\n   </Archetype>\n   <Transforms>\n");
             foreach (var b in bodies) { var t = (b.mn + b.mx) * 0.5f - com; sb.Append($"    <Item>1 0 0 0\n0 1 0 0\n0 0 1 0\n{F(t.X)} {F(t.Y)} {F(t.Z)} 0</Item>\n"); }
             sb.Append("   </Transforms>\n   <Groups>\n");
@@ -457,9 +465,51 @@ namespace DoorCore
             return sb.ToString();
         }
 
+        // the piece's own triangles as collision (welded, degenerate triangles dropped) - a bridge deck stays walkable
+        // at its real height instead of on top of a box that includes the railings
+        static string GeometryChild(List<Vector3> tris, int mat)
+        {
+            var verts = new List<Vector3>(); var map = new Dictionary<(long, long, long), int>(); var polys = new List<(int, int, int)>();
+            int V(Vector3 p)
+            {
+                var key = ((long)Math.Round(p.X * 500), (long)Math.Round(p.Y * 500), (long)Math.Round(p.Z * 500));
+                if (!map.TryGetValue(key, out int i)) { i = verts.Count; verts.Add(p); map[key] = i; }
+                return i;
+            }
+            for (int t = 0; t + 2 < tris.Count; t += 3)
+            {
+                var a = tris[t]; var b = tris[t + 1]; var c = tris[t + 2];
+                if (Vector3.Cross(b - a, c - a).Length() < 1e-6f) continue;
+                int ia = V(a), ib = V(b), ic = V(c);
+                if (ia == ib || ib == ic || ia == ic) continue;
+                polys.Add((ia, ib, ic));
+            }
+            if (polys.Count == 0 || verts.Count > 30000 || polys.Count > 30000) return null;   // fall back to the box
+            var mn = verts.Aggregate(Vector3.Min); var mx = verts.Aggregate(Vector3.Max);
+            var s = mx - mn;
+            for (int k = 0; k < 3; k++) if (s[k] < 0.02f) { mn[k] -= 0.01f; mx[k] += 0.01f; }
+            s = mx - mn;
+            var gc = (mn + mx) * 0.5f;
+            var sb = new StringBuilder("<Item type=\"Geometry\">");
+            sb.Append(V2("BoxMin", mn)).Append(V2("BoxMax", mx)).Append(V2("BoxCenter", gc)).Append(V2("SphereCenter", gc));
+            sb.Append($"<SphereRadius value=\"{F((mx - mn).Length() * 0.5f)}\" /><Margin value=\"0.01\" /><Volume value=\"{F(s.X * s.Y * s.Z * 0.5f)}\" />");
+            sb.Append(V2("Inertia", Animated.BoxInertia(s, 1f)));
+            sb.Append($"<MaterialIndex value=\"{mat}\" /><MaterialColourIndex value=\"0\" /><ProceduralID value=\"0\" /><RoomID value=\"0\" /><PedDensity value=\"0\" /><UnkFlags value=\"0\" /><PolyFlags value=\"0\" /><UnkType value=\"2\" />");
+            sb.Append("<CompositeTransform>1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1</CompositeTransform>");
+            sb.Append(V2("GeometryCenter", gc)).Append("<UnkFloat1 value=\"0\" /><UnkFloat2 value=\"0\" />");
+            sb.Append($"<Materials><Item><Type value=\"{mat}\" /><ProceduralID value=\"0\" /><RoomID value=\"0\" /><PedDensity value=\"0\" /><Flags>NONE</Flags><MaterialColourIndex value=\"0\" /><Unk value=\"0\" /></Item></Materials>");
+            sb.Append("<Vertices>");
+            foreach (var v in verts) { var r = v - gc; sb.Append($"{F(r.X)}, {F(r.Y)}, {F(r.Z)}\n"); }
+            sb.Append("</Vertices><Polygons>");
+            foreach (var (a, b, c) in polys) sb.Append($"<Triangle m=\"0\" v1=\"{a}\" v2=\"{b}\" v3=\"{c}\" f1=\"0\" f2=\"0\" f3=\"0\" />");
+            sb.Append("</Polygons></Item>");
+            return sb.ToString();
+        }
+        static string V2(string t, Vector3 v) => Animated.V(t, v);
+
         static string YtypXml(string ytypName, string arch, string model, JsonObject y, uint flags, Vector3 bbMin, Vector3 bbMax, Vector3 centre, float radius)
         {
-            float lod = (float?)y["lodDist"] ?? 150f;
+            float lod = (float?)y["lodDist"] ?? Math.Max(200f, radius * 20f);
             float hd = (float?)y["hdTextureDist"] ?? 15f;
             var sb = new StringBuilder();
             sb.Append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<CMapTypes>\n <extensions />\n <archetypes>\n  <Item type=\"CBaseArchetypeDef\">\n");

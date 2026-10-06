@@ -44,7 +44,7 @@ export function defaultDoor() {
     sound: { mode: 'auto', id: null },
     ytyp: { archetypeName: '', modelName: '', ytypName: '', lodDist: 100, hdTextureDist: 15, flags: FLAG_DYNAMIC | FLAG_DOOR_PHYSICS, flagsAuto: true, textureDictionary: null },
     export: { folder: null, streamYbn: false, withScript: false },
-    destruct: { pieces: 12, seed: 1, strength: 'normal', anchored: true },
+    destruct: { pieces: 12, seed: 1, strength: 'normal', anchored: true, collision: 'mesh' },
     custom: { interp: 'linear', keys: [{ t: 0, r: [0, 0, 0], p: [0, 0, 0] }, { t: 4, r: [0, 0, 360], p: [0, 0, 0] }] },
   };
 }

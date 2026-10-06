@@ -159,6 +159,8 @@
           <button data-ds="fragile" title="50 - breaks with bullets / bumps">FRAGILE</button><button data-ds="normal" title="300 - breaks with cars and explosions">NORMAL</button>
           <button data-ds="solid" title="1500 - needs a big explosion or a heavy vehicle">SOLID</button><button data-ds="verysolid" title="5000 - only very big hits">VERY SOLID</button>
         </div>
+        <label class="lbl">Collision of the pieces</label>
+        <div class="seg" id="des-col"><button data-dcol="mesh" title="Each piece collides with its real shape - a bridge deck stays walkable at the right height">REAL SHAPE</button><button data-dcol="box" title="One box per piece - lighter, but boxes can stick out (e.g. above railings)">BOXES</button></div>
         <label class="check"><input type="checkbox" id="in-anchored" checked /> Anchored <span class="muted">(stays in place until it breaks - bridges, walls)</span></label>
         <div class="hint" id="des-info"></div>
       </div>

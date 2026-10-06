@@ -572,10 +572,11 @@ function refreshDestruct() {
   if (document.activeElement !== $('in-pieces')) $('in-pieces').value = ds.pieces;
   $('v-pieces').textContent = ds.pieces;
   seg('des-strength', 'ds', ds.strength);
+  seg('des-col', 'dcol', ds.collision || 'mesh');
   $('in-anchored').checked = ds.anchored !== false;
   const got = S.shards && S.shards.key === shardKey() ? S.shards : null;
   $('des-info').innerHTML = (got ? `<b>${got.pieces.length} pieces</b> (${got.triangles.toLocaleString()} triangles after cutting) · ` : 'Cutting… · ') +
-    `strength ${D.DESTRUCT_STRENGTH[ds.strength]}. In-game every piece breaks off by itself when an explosion, a vehicle or bullets hit it hard enough, then falls with real GTA physics - <b>no script</b>. Collision = one box per piece (material from COLLISION).`;
+    `strength ${D.DESTRUCT_STRENGTH[ds.strength]}. In-game every piece breaks off by itself when an explosion, a vehicle or bullets hit it hard enough, then falls with real GTA physics - <b>no script</b>. Collision = ${(ds.collision || 'mesh') === 'mesh' ? 'the real shape of every piece' : 'one box per piece'} (material from COLLISION).`;
   if (!got) requestShards();
 }
 function shardKey() { return `${S.model?.path}|${S.door.destruct.pieces}|${S.door.destruct.seed}`; }
@@ -829,7 +830,7 @@ function exportJob(outDir, outputs) {
       ytypName: a.ytypName, archetypeName: a.archetypeName, assetName: a.modelName, lodDist: a.lodDist, hdTextureDist: a.hdTextureDist,
       flags: a.flags, specialAttribute: a.specialAttribute, textureDictionary: a.textureDictionary, physicsDictionary: a.archetypeName,
     },
-    destruct: a.destruct ? { pieces: S.door.destruct.pieces, seed: S.door.destruct.seed, strength: D.DESTRUCT_STRENGTH[S.door.destruct.strength], anchored: S.door.destruct.anchored !== false } : undefined,
+    destruct: a.destruct ? { pieces: S.door.destruct.pieces, seed: S.door.destruct.seed, strength: D.DESTRUCT_STRENGTH[S.door.destruct.strength], anchored: S.door.destruct.anchored !== false, collision: S.door.destruct.collision || 'mesh' } : undefined,
     anim: a.anim ? (() => {
       if (a.anim.auto) return { dict: a.anim.dict, samples: D.customSamples(S.door) };
       const ms = D.motionSpec(S.door, S.an, pivot());
@@ -1154,6 +1155,7 @@ function bind() {
   $('btn-recut').onclick = () => { S.door.destruct.seed = (S.door.destruct.seed | 0) + 1; touch(); };
   $('btn-breakprev').onclick = () => { S.preview.t = 0; play(); };
   $$('[data-ds]').forEach((b) => b.onclick = () => { S.door.destruct.strength = b.dataset.ds; touch(); });
+  $$('[data-dcol]').forEach((b) => b.onclick = () => { S.door.destruct.collision = b.dataset.dcol; touch(); });
   $('in-anchored').onchange = () => { S.door.destruct.anchored = $('in-anchored').checked; touch(); };
 
   // custom animation
