@@ -16,9 +16,12 @@
   <!-- ================================================================ TOP BAR -->
   <header id="topbar">
     <div class="brand"><span class="brand-mark"></span><span class="brand-text">GTA DOOR CREATOR</span><span class="brand-sub">FiveM · MLO</span></div>
+    <button class="home-btn" id="btn-home" title="Home">⌂ HOME</button>
     <nav class="menu">
       <div class="menu-item" id="menu-file">File
         <div class="menu-pop">
+          <button data-cmd="home">Home</button>
+          <hr />
           <button data-cmd="new">New Project <kbd>Ctrl+N</kbd></button>
           <button data-cmd="open">Open Project… <kbd>Ctrl+O</kbd></button>
           <button data-cmd="save">Save Project <kbd>Ctrl+S</kbd></button>
@@ -43,6 +46,44 @@
       <span id="engine-status" class="engine-status" title="DoorCore engine">● Engine…</span>
     </div>
   </header>
+
+  <!-- ================================================================ HOME -->
+  <section id="home" class="home">
+    <div class="home-inner">
+      <div class="home-head">
+        <span class="home-mark"></span>
+        <h1>GTA DOOR CREATOR</h1>
+        <p>Doors, sounds, animations and destructible props for FiveM - no Blender, no script needed.</p>
+      </div>
+      <div class="home-cards">
+        <button class="home-card" data-home="door">
+          <svg viewBox="0 0 64 64"><rect x="14" y="8" width="30" height="48" rx="2" fill="none" stroke="currentColor" stroke-width="3"/><path d="M44 8 L54 14 L54 52 L44 56" fill="none" stroke="currentColor" stroke-width="3" opacity=".55"/><circle cx="38" cy="33" r="2.6" fill="currentColor"/></svg>
+          <b>CREATE DOOR</b>
+          <span>Normal, sliding or garage door. GTA native door (pushable), scripted with E, or animated .ycd.</span>
+        </button>
+        <button class="home-card" data-home="sound">
+          <svg viewBox="0 0 64 64"><path d="M10 25 H20 L33 14 V50 L20 39 H10 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M41 24 Q47 32 41 40 M47 18 Q57 32 47 46" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+          <b>DOOR SOUND</b>
+          <span>Give a GTA door sound to doors you already made. One small audio file, nothing else changes.</span>
+        </button>
+        <button class="home-card" data-home="custom">
+          <svg viewBox="0 0 64 64"><path d="M50 32 A18 18 0 1 1 44 18.5" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/><path d="M46 8 L46 20 L34 20" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="25" y="25" width="14" height="14" rx="2" fill="currentColor" opacity=".6"/></svg>
+          <b>ANIMATION</b>
+          <span>Make any prop move: logo spinning 360°, sign swinging, bobbing... loops by itself in-game.</span>
+        </button>
+        <button class="home-card" data-home="destruct">
+          <svg viewBox="0 0 64 64"><path d="M8 40 L22 30 L30 42 L18 52 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M28 14 L44 10 L46 26 L32 30 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M38 38 L54 34 L56 50 L42 54 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M14 18 l4 4 M50 16 l-3 4 M30 54 l2 -5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+          <b>DESTRUCT</b>
+          <span>Cut a prop (bridge, wall, sign) into pieces that break with explosions, vehicles and bullets.</span>
+        </button>
+      </div>
+      <div class="home-foot">
+        <button class="btn" id="home-open">Open project…</button>
+        <button class="btn" id="home-continue">Continue to the editor →</button>
+        <span class="muted" id="home-version"></span>
+      </div>
+    </div>
+  </section>
 
   <!-- ================================================================ LEFT PANEL -->
   <aside id="left">

@@ -28,6 +28,9 @@ Nothing else to install: the release build includes everything (no .NET, no Blen
 
 ## Features
 
+The app opens on a **home page** with 4 big choices: **CREATE DOOR**, **DOOR SOUND**, **ANIMATION**, **DESTRUCT** (⌂ HOME in the top bar brings it back).
+
+
 | | |
 |---|---|
 | **Import** | Drag & drop `.ydr`, CodeWalker `.ydr.xml`, `.ytyp` (reads LOD / flags / texture dictionary), `.ybn` (collision), `.ytd` (texture preview). |
@@ -114,8 +117,8 @@ or just run `build-windows.bat`. Dev mode: `npm run build:core` then `npm start`
 The GitHub Action in `.github/workflows/release.yml` builds everything on Windows and attaches the installer + zip to a Release when you push a tag:
 
 ```bash
-git tag v1.10.1
-git push origin v1.10.1
+git tag v1.11.0
+git push origin v1.11.0
 ```
 
 ### Project layout

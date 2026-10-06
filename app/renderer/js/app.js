@@ -207,6 +207,7 @@ function archetype() {
 // ------------------------------------------------------------------ loading
 async function loadPaths(paths) {
   if (!paths || !paths.length) return;
+  showHome(false);
   const order = { '.ydr': 0, '.xml': 0, '.ytyp': 1, '.ybn': 2, '.ytd': 3 };
   const ext = (p) => (p.match(/\.[^.\\/]+$/) || [''])[0].toLowerCase();
   paths = [...paths].sort((a, b) => (order[ext(a)] ?? 9) - (order[ext(b)] ?? 9));
@@ -225,8 +226,8 @@ async function loadPaths(paths) {
       console.error(err);
     } finally { document.body.style.cursor = ''; }
   }
+  if (S.pendingType && S.model) applyPendingType();
 }
-
 async function onYdr(res, keepDoor = null) {
   for (const m of res.meshes) m._pos = b64ToF32(m.positions);
   S.model = res; S.hullCache = null; S.shards = null;
@@ -563,6 +564,24 @@ function updateAnimInfo() {
     'In-game it starts and loops by itself - <b>no script</b> - and the collision turns with it.' +
     (seamless ? '' : '<br><span class="w">⚠ The last key is not the same as the first (or a full turn): the loop will jump back.</span>') +
     (big ? '<br><span class="muted">Tip: more than 180° between two keys is fine (360° spins work).</span>' : '');
+}
+
+// ------------------------------------------------------------------ HOME
+function showHome(on = true) { $('home').classList.toggle('hidden', !on); }
+async function homePick(mode) {
+  showHome(false);
+  if (mode === 'sound') { openSoundOnly(); return; }
+  S.pendingType = mode === 'door' ? null : mode;   // 'custom' | 'destruct' : chosen right after the prop is imported
+  if (S.model) { applyPendingType(); return; }
+  const paths = await api.openPropDialog();
+  if (paths && paths.length) await loadPaths(paths);
+}
+function applyPendingType() {
+  const t = S.pendingType; S.pendingType = null;
+  if (!S.model || !t) return;
+  if (!S.door.created) createDoor(false);
+  setType(t); touch();
+  toast(t === 'destruct' ? 'DESTRUCT: choose the number of pieces, then EXPORT FIVEM RESOURCE' : 'ANIMATION: pick a preset or edit the keyframes, then EXPORT FIVEM RESOURCE', 'ok');
 }
 
 // ------------------------------------------------------------------ DESTRUCTIBLE panel
@@ -1037,7 +1056,11 @@ function bind() {
   document.addEventListener('click', () => $('menu-file').classList.remove('open'));
   $$('#menu-file [data-cmd]').forEach((b) => b.onclick = () => menuCmd(b.dataset.cmd));
   api?.onMenu(menuCmd);
-  api?.onOpenProject?.((p) => openProject(p));
+  api?.onOpenProject?.((p) => { showHome(false); openProject(p); });
+  $('btn-home').onclick = () => showHome(true);
+  $$('[data-home]').forEach((b) => b.onclick = () => homePick(b.dataset.home));
+  $('home-open').onclick = () => { showHome(false); openProject(); };
+  $('home-continue').onclick = () => showHome(false);
 
   // import
   const importDialog = async () => loadPaths(await api.openPropDialog());
@@ -1290,6 +1313,7 @@ async function menuCmd(cmd) {
     try { await api.buildSample(out, cmd === 'sample' ? 'door' : 'garage'); await loadPaths([out]); } catch (e) { toast(e.message, 'err'); }
   }
   else if (cmd === 'soundOnly') openSoundOnly();
+  else if (cmd === 'home') showHome(true);
   else if (cmd === 'shortcut' ) { const ok = await window.api.shortcut(); toast(ok ? 'Desktop shortcut created' : 'Could not create the shortcut', ok ? 'ok' : 'err'); }
   else if (cmd === 'shortcut:ok') toast('Desktop shortcut created', 'ok');
   else if (cmd === 'shortcut:fail') toast('Could not create the shortcut', 'err');
@@ -1303,6 +1327,7 @@ async function boot() {
   fillSoundSelect();
   bind();
   seg('view-seg', 'view', 'persp'); seg('shade-seg', 'shade', 'material'); seg('yp-mode', 'yp', 'text');
+  try { const inf = await api.info(); $('home-version').textContent = 'v' + (inf.version || ''); } catch { }
   S.settings = await api.loadSettings();
   S.door.export.folder = S.settings.outFolder || null;
   S.userPresets = await api.loadPresets();
