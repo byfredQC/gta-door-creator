@@ -82,6 +82,23 @@ ipcMain.handle('core:export', (_e, job) => core.request('export', job));
 ipcMain.handle('core:buildSample', (_e, out, kind) => core.request('build', { out, kind }));
 ipcMain.handle('core:audio', (_e, out, links) => core.request('audio', { out, links }));
 ipcMain.handle('core:splitPreview', (_e, source, pieces, seed) => core.request('splitpreview', { source, pieces, seed }));
+ipcMain.handle('core:treeScan', (_e, payload) => core.request('treescan', payload));
+ipcMain.handle('core:treeBuild', (_e, payload) => core.request('treebuild', payload));
+ipcMain.handle('dialog:openYmap', async () => {
+  const r = await dialog.showOpenDialog(win, { title: 'Choose the ymap with your trees', properties: ['openFile'], filters: [{ name: 'YMAP', extensions: ['ymap', 'xml'] }] });
+  return r.canceled ? null : r.filePaths[0];
+});
+// GTA V Legacy folder: usual install places (Rockstar launcher, Steam, Epic) on every drive
+ipcMain.handle('app:detectGta', () => {
+  const ok = (d) => { try { return fs.existsSync(path.join(d, 'GTA5.exe')) && fs.existsSync(path.join(d, 'x64a.rpf')); } catch { return false; } };
+  const subs = ['Program Files\\Rockstar Games\\Grand Theft Auto V', 'Program Files\\Rockstar Games\\Grand Theft Auto V Legacy',
+    'Program Files (x86)\\Steam\\steamapps\\common\\Grand Theft Auto V', 'Program Files (x86)\\Steam\\steamapps\\common\\Grand Theft Auto V Legacy',
+    'Program Files\\Epic Games\\GTAV', 'SteamLibrary\\steamapps\\common\\Grand Theft Auto V', 'SteamLibrary\\steamapps\\common\\Grand Theft Auto V Legacy',
+    'Grand Theft Auto V', 'Grand Theft Auto V Legacy', 'Games\\Grand Theft Auto V', 'Games\\Grand Theft Auto V Legacy', 'gta_fred\\Grand Theft Auto V Legacy'];
+  for (const drive of 'CDEFGH') for (const s of subs) { const d = drive + ':\\' + s; if (ok(d)) return d; }
+  return null;
+});
+ipcMain.handle('app:isGta', (_e, d) => { try { return fs.existsSync(path.join(d, 'GTA5.exe')) && fs.existsSync(path.join(d, 'x64a.rpf')); } catch { return false; } });
 ipcMain.handle('core:destructAnim', (_e, pieces, anim, seed) => core.request('destructanim', { pieces, anim, seed }));
 
 ipcMain.handle('dialog:openProp', async () => {

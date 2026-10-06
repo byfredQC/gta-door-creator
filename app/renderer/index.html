@@ -79,11 +79,66 @@
           <b>DESTRUCT</b>
           <span>Cut a prop (bridge, wall, sign) into pieces that break with explosions, vehicles and bullets.</span>
         </button>
+        <button class="home-card" data-home="lod">
+          <svg viewBox="0 0 64 64"><path d="M20 10 L32 30 H26 L36 46 H4 L14 30 H8 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" transform="translate(4 0)"/><path d="M24 46 V54" stroke="currentColor" stroke-width="3"/><path d="M46 24 L52 34 H49 L54 42 H38 L43 34 H40 Z" fill="currentColor" opacity=".55"/><path d="M46 42 V47" stroke="currentColor" stroke-width="2.5" opacity=".55"/></svg>
+          <b>TREE LOD</b>
+          <span>Your ymap of GTA trees seen from far away: LOD models + a _lod.ymap linked to your ymap, like GTA forests.</span>
+        </button>
       </div>
       <div class="home-foot">
         <button class="btn" id="home-open">Open project…</button>
         <button class="btn" id="home-continue">Continue to the editor →</button>
         <span class="muted" id="home-version"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================ TREE LOD page -->
+  <section id="lod-page" class="lod-page hidden">
+    <div class="lod-inner">
+      <div class="lod-head">
+        <div><b>TREE LOD</b><span>Trees of your ymap visible from far away: the app makes a light LOD model per tree type (its own lowest detail level),
+          a <code>_lod.ymap</code> with one LOD per tree and links your ymap to it - the chain GTA uses for its forests.</span></div>
+        <ol class="lod-steps"><li>GTA V folder</li><li>Your ymap</li><li>Pick the trees</li><li>Generate</li></ol>
+      </div>
+      <div class="lod-grid">
+        <div class="lod-col">
+          <section class="panel">
+            <div class="panel-h"><b>1 · GTA V FOLDER</b> <span class="muted">read only - nothing is changed in it</span></div>
+            <div class="lod-path" id="lod-gta">–</div>
+            <div class="row2"><button class="btn" id="lod-gta-detect">Find it</button><button class="btn" id="lod-gta-choose">Choose…</button></div>
+            <div class="hint">GTA V <b>Legacy</b> (the one FiveM uses). The models of your trees are read from it, the LOD keeps using GTA's own textures.</div>
+          </section>
+          <section class="panel">
+            <div class="panel-h"><b>2 · YOUR YMAP</b></div>
+            <div class="dropzone small" id="lod-drop"><div class="dz-icon"></div><b>Drop your .ymap here</b><span class="muted">or click to choose (.ymap or .ymap.xml)</span></div>
+            <div class="lod-ymap" id="lod-ymap"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-h"><b>4 · DISTANCES</b></div>
+            <label class="lbl">Tree → LOD switch <b id="lod-v-hd">AUTO</b> <span class="muted">(AUTO = each tree's own GTA distance)</span></label>
+            <input type="range" id="lod-hd" min="0" max="400" step="10" value="0" />
+            <label class="lbl">LOD visible up to <b id="lod-v-lod">1500 m</b></label>
+            <input type="range" id="lod-lod" min="500" max="3000" step="100" value="1500" />
+            <button class="btn-create lod-go" id="lod-go" disabled>GENERATE LOD RESOURCE</button>
+            <div class="hint" id="lod-out"></div>
+          </section>
+        </div>
+        <div class="lod-col wide">
+          <section class="panel">
+            <div class="panel-h"><b>3 · TREES IN THIS YMAP</b> <span class="muted" id="lod-sum"></span>
+              <span class="lod-tools"><button class="btn tiny" id="lod-all">All trees</button><button class="btn tiny" id="lod-none">None</button></span></div>
+            <div class="lod-table-wrap"><table class="lod-table"><thead><tr><th></th><th>Model</th><th>Count</th><th>LOD from</th><th>Triangles</th><th>Status</th></tr></thead><tbody id="lod-rows"><tr><td colspan="6" class="muted">Choose the GTA folder and your ymap.</td></tr></tbody></table></div>
+          </section>
+          <section class="panel">
+            <div class="panel-h"><b>MAP</b> <span class="muted">top view · <i class="dot on"></i> gets a LOD · <i class="dot"></i> unchanged</span></div>
+            <canvas id="lod-map" width="900" height="420"></canvas>
+          </section>
+          <section class="panel">
+            <div class="panel-h"><b>LOG</b></div>
+            <div class="lod-log" id="lod-log"></div>
+          </section>
+        </div>
       </div>
     </div>
   </section>
