@@ -129,6 +129,32 @@ ipcMain.on('win:title', (_e, t) => { if (win) win.setTitle(t); });
 ipcMain.on('win:dirty', (_e, d) => { dirty = !!d; });
 ipcMain.handle('app:info', () => ({ version: app.getVersion(), platform: process.platform, argv: process.argv }));
 
+// ---------------------------------------------------------------- uninstall (Settings)
+function uninstallerPath() {
+  if (process.platform !== 'win32' || !app.isPackaged) return null;
+  const dir = path.dirname(process.execPath);
+  try {
+    const f = fs.readdirSync(dir).find((x) => /^uninstall.*\.exe$/i.test(x));
+    return f ? path.join(dir, f) : null;
+  } catch { return null; }
+}
+ipcMain.handle('app:uninstallInfo', () => ({
+  installed: !!uninstallerPath(),
+  portable: process.env.PORTABLE_EXECUTABLE_FILE || null,
+  exe: process.execPath,
+  folder: path.dirname(process.execPath),
+  userData: app.getPath('userData'),
+}));
+ipcMain.handle('app:uninstall', (_e, wipeData) => {
+  const u = uninstallerPath();
+  if (!u) return false;
+  if (wipeData) for (const f of ['settings.json', 'presets.json', 'shortcut.json']) { try { fs.rmSync(path.join(app.getPath('userData'), f), { force: true }); } catch { } }
+  require('child_process').spawn(u, [], { detached: true, stdio: 'ignore' }).unref();
+  setTimeout(() => { for (const w of BrowserWindow.getAllWindows()) w.destroy(); app.quit(); }, 400);
+  return true;
+});
+ipcMain.handle('app:openFolder', (_e, which) => shell.openPath(which === 'data' ? app.getPath('userData') : path.dirname(process.execPath)));
+
 // ---------------------------------------------------------------- desktop shortcut (Windows)
 function desktopShortcut(force = false) {
   if (process.platform !== 'win32' || !app.isPackaged) return false;

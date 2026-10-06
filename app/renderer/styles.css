@@ -372,3 +372,12 @@ body[data-mode="anim"] #ds-type, body[data-mode="destruct"] #ds-type { pointer-e
 /* DOOR SOUND as its own page */
 #so-modal.as-page { inset: 46px 0 0 0; background: radial-gradient(1000px 500px at 50% -10%, #2a1245 0%, transparent 60%), var(--bg0); z-index: 190; align-items: flex-start; padding-top: 40px; overflow: auto; }
 #so-modal.as-page .modal-box { width: min(720px, 92vw); box-shadow: 0 20px 60px #000c, 0 0 0 1px #a855f744; }
+
+/* settings */
+.set-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.set-row span { color: var(--text2); }
+.set-row .btn { padding: 4px 12px; }
+.set-danger { margin-top: 14px; padding: 12px; border: 1px solid #ff646455; border-radius: 8px; background: #ff64640c; }
+.set-danger b { color: #ff8a8a; font: 700 12.5px var(--font-head); letter-spacing: .08em; }
+.set-danger p { margin: 6px 0 8px; font-size: 12px; }
+#btn-settings { margin-right: 6px; }

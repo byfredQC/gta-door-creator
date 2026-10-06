@@ -568,6 +568,42 @@ function updateAnimInfo() {
     (big ? '<br><span class="muted">Tip: more than 180° between two keys is fine (360° spins work).</span>' : '');
 }
 
+// ------------------------------------------------------------------ SETTINGS
+async function openSettings() {
+  let inf = {}, ui = {};
+  try { inf = await api.info(); ui = await api.uninstallInfo(); } catch { }
+  const how = ui.installed ? 'Installed version - the Windows uninstaller will open.'
+    : ui.portable ? `Single .exe version - nothing is installed: just delete <b>${esc(ui.portable)}</b>.`
+      : 'Portable / zip version - nothing is installed: just delete the folder.';
+  const r = await modal('SETTINGS', `
+    <div class="set-row"><span>Version</span><b>v${esc(inf.version || '?')}</b></div>
+    <div class="set-row"><span>Program folder</span><button class="btn" id="set-open-app">Open</button></div>
+    <div class="set-row"><span>Settings &amp; presets</span><button class="btn" id="set-open-data">Open</button></div>
+    <div class="set-row"><span>Desktop shortcut</span><button class="btn" id="set-shortcut">Create</button></div>
+    <div class="set-danger">
+      <b>Uninstall GTA Door Creator</b>
+      <p class="muted">${how}</p>
+      ${ui.installed ? '<label class="check"><input type="checkbox" id="set-wipe" checked /> Also delete my settings and presets</label>' : ''}
+    </div>`, [{ label: 'Close', value: false }, ...(ui.installed ? [{ label: 'UNINSTALL…', value: 'uninstall', accent: true }] : [])]);
+  if (r !== 'uninstall') return;
+  const wipe = $('set-wipe')?.checked;
+  if (S.project.dirty) {
+    const ok = await modal('Unsaved project', '<p>Your project has unsaved changes. Uninstall anyway?</p>', [{ label: 'Cancel', value: false }, { label: 'Uninstall', value: true, accent: true }]);
+    if (!ok) return;
+  }
+  const sure = await modal('Uninstall GTA Door Creator?', '<p>The app will close and the Windows uninstaller will open.</p><p class="muted">Your exported resources and .doorproject files are not touched.</p>',
+    [{ label: 'Cancel', value: false }, { label: 'Uninstall', value: true, accent: true }]);
+  if (!sure) return;
+  const done = await api.uninstall(!!wipe);
+  if (!done) toast('Uninstaller not found - delete the program folder by hand', 'err');
+}
+document.addEventListener('click', (e) => {
+  const id = e.target?.id;
+  if (id === 'set-open-app') api.openAppFolder('app');
+  else if (id === 'set-open-data') api.openAppFolder('data');
+  else if (id === 'set-shortcut') window.api.shortcut().then((ok) => toast(ok ? 'Desktop shortcut created' : 'Could not create the shortcut', ok ? 'ok' : 'err'));
+});
+
 // ------------------------------------------------------------------ HOME
 function showHome(on = true) { $('home').classList.toggle('hidden', !on); if (on) { $('so-modal').classList.add('hidden'); } }
 const MODE_TITLES = { door: 'CREATE DOOR', sound: 'DOOR SOUND', anim: 'ANIMATION', destruct: 'DESTRUCT' };
@@ -1076,6 +1112,7 @@ function bind() {
   api?.onMenu(menuCmd);
   api?.onOpenProject?.((p) => { showHome(false); openProject(p); });
   $('btn-home').onclick = () => showHome(true);
+  $('btn-settings').onclick = openSettings;
   $$('[data-home]').forEach((b) => b.onclick = () => homePick(b.dataset.home));
   $('home-open').onclick = () => { showHome(false); setMode(null); openProject(); };
   $('home-continue').onclick = () => { showHome(false); if (!S.mode || S.mode === 'sound') setMode('door'); };
@@ -1332,6 +1369,7 @@ async function menuCmd(cmd) {
   }
   else if (cmd === 'soundOnly') { if (S.mode === 'sound') setMode('door'); openSoundOnly(); }
   else if (cmd === 'home') showHome(true);
+  else if (cmd === 'settings') openSettings();
   else if (cmd === 'shortcut' ) { const ok = await window.api.shortcut(); toast(ok ? 'Desktop shortcut created' : 'Could not create the shortcut', ok ? 'ok' : 'err'); }
   else if (cmd === 'shortcut:ok') toast('Desktop shortcut created', 'ok');
   else if (cmd === 'shortcut:fail') toast('Could not create the shortcut', 'err');
