@@ -328,6 +328,7 @@ function createDoor(announce = true) {
   if (r.garageKind === 'rollup') d.garage.panels = 12;
   d.pivot.mode = 'auto';
   S.preview.t = 0;
+  if (S.mode === 'anim' || S.mode === 'destruct') { setType(S.mode === 'anim' ? 'custom' : 'destruct'); S.configured = true; refresh(); setDirty(); return; }
   refresh(); setDirty();
   if (announce) toast(`Door created: ${r.type} door, pivot ${r.type === 'normal' ? 'on the ' + r.hinge + ' edge' : '= ' + r.pivotLabel.toLowerCase()}, YTYP data ready. Check the door type.`, 'ok');
 }
@@ -465,7 +466,8 @@ function refresh() {
   const d = S.door, has = !!S.model, created = has && d.created;
   $('btn-create').disabled = !has;
   $('btn-create').classList.toggle('created', created);
-  $('btn-create').querySelector('.bc-title').textContent = created ? '✓ DOOR CREATED' : 'CREATE DOOR';
+  const what = S.mode === 'anim' ? 'ANIMATION' : S.mode === 'destruct' ? 'DESTRUCTIBLE' : 'DOOR';
+  $('btn-create').querySelector('.bc-title').textContent = created ? `✓ ${what} CREATED` : `CREATE ${what}`;
   for (const id of ['panel-detect']) $(id).classList.toggle('locked', !has);
   for (const id of ['panel-type', 'panel-settings', 'panel-pivot', 'panel-collision', 'panel-sound', 'panel-doorsettings']) $(id).classList.toggle('locked', !created);
   for (const id of ['panel-ytyp', 'panel-export']) $(id).classList.toggle('locked', !created);
@@ -567,9 +569,25 @@ function updateAnimInfo() {
 }
 
 // ------------------------------------------------------------------ HOME
-function showHome(on = true) { $('home').classList.toggle('hidden', !on); }
+function showHome(on = true) { $('home').classList.toggle('hidden', !on); if (on) { $('so-modal').classList.add('hidden'); } }
+const MODE_TITLES = { door: 'CREATE DOOR', sound: 'DOOR SOUND', anim: 'ANIMATION', destruct: 'DESTRUCT' };
+function setMode(mode) {
+  S.mode = mode;
+  document.body.dataset.mode = mode || '';
+  $('page-title').textContent = MODE_TITLES[mode] || '';
+  $('so-modal').classList.toggle('as-page', mode === 'sound');
+  $('so-close').textContent = mode === 'sound' ? '← Home' : 'Close';
+  // a model already loaded follows the page: door types on the door page, custom / destruct on theirs
+  if (S.model && S.door.created) {
+    if (mode === 'door' && (S.door.type === 'custom' || S.door.type === 'destruct')) { setType('normal'); touch(); }
+    if (mode === 'anim' && S.door.type !== 'custom') { setType('custom'); touch(); }
+    if (mode === 'destruct' && S.door.type !== 'destruct') { setType('destruct'); touch(); }
+  }
+  refresh();
+}
 async function homePick(mode) {
   showHome(false);
+  setMode(mode === 'custom' ? 'anim' : mode);
   if (mode === 'sound') { openSoundOnly(); return; }
   S.pendingType = mode === 'door' ? null : mode;   // 'custom' | 'destruct' : chosen right after the prop is imported
   if (S.model) { applyPendingType(); return; }
@@ -1059,8 +1077,8 @@ function bind() {
   api?.onOpenProject?.((p) => { showHome(false); openProject(p); });
   $('btn-home').onclick = () => showHome(true);
   $$('[data-home]').forEach((b) => b.onclick = () => homePick(b.dataset.home));
-  $('home-open').onclick = () => { showHome(false); openProject(); };
-  $('home-continue').onclick = () => showHome(false);
+  $('home-open').onclick = () => { showHome(false); setMode(null); openProject(); };
+  $('home-continue').onclick = () => { showHome(false); if (!S.mode || S.mode === 'sound') setMode('door'); };
 
   // import
   const importDialog = async () => loadPaths(await api.openPropDialog());
@@ -1154,8 +1172,8 @@ function bind() {
   });
 
   // sound only tool
-  $('btn-soundonly').onclick = openSoundOnly;
-  $('so-close').onclick = () => $('so-modal').classList.add('hidden');
+  $('btn-soundonly').onclick = () => { showHome(false); setMode('sound'); openSoundOnly(); };
+  $('so-close').onclick = () => { $('so-modal').classList.add('hidden'); if (S.mode === 'sound') showHome(true); };
   $('so-names').oninput = soRefresh; $('so-file').oninput = soRefresh;
   $('so-sound').onchange = () => { SO.sound = $('so-sound').value; soRefresh(); };
   $('so-fromytyp').onclick = soFromYtyp;
@@ -1312,7 +1330,7 @@ async function menuCmd(cmd) {
     const out = joinPath(dir, cmd === 'sample' ? 'gdc_sample_door.ydr' : 'gdc_sample_garage.ydr');
     try { await api.buildSample(out, cmd === 'sample' ? 'door' : 'garage'); await loadPaths([out]); } catch (e) { toast(e.message, 'err'); }
   }
-  else if (cmd === 'soundOnly') openSoundOnly();
+  else if (cmd === 'soundOnly') { if (S.mode === 'sound') setMode('door'); openSoundOnly(); }
   else if (cmd === 'home') showHome(true);
   else if (cmd === 'shortcut' ) { const ok = await window.api.shortcut(); toast(ok ? 'Desktop shortcut created' : 'Could not create the shortcut', ok ? 'ok' : 'err'); }
   else if (cmd === 'shortcut:ok') toast('Desktop shortcut created', 'ok');

@@ -359,3 +359,16 @@ body.dragging .drop-overlay { display: flex; }
 .home-foot { display: flex; gap: 10px; justify-content: center; align-items: center; margin-top: 30px; }
 .home-foot .muted { margin-left: 8px; font-size: 11px; }
 @media (max-width: 900px) { .home-cards { grid-template-columns: repeat(2, 1fr); } }
+
+/* ---------------------------------------------------------------- one page per mode */
+.page-title { font: 800 13px var(--font-head); letter-spacing: .14em; color: #fff; background: linear-gradient(135deg, var(--accent), #6d28d9); padding: 4px 12px; border-radius: 5px; margin-right: 12px; }
+.page-title:empty { display: none; }
+body[data-mode="door"] .type-btn[data-type="custom"], body[data-mode="door"] .type-btn[data-type="destruct"] { display: none; }
+body[data-mode="door"] .type-grid { grid-template-columns: repeat(3, 1fr); }
+body[data-mode="door"] .type-grid .type-btn { font-size: 10.5px; }
+body[data-mode="anim"] :is(#panel-detect, #panel-type, #panel-sound, #panel-doorsettings, #panel-presets, #btn-soundonly),
+body[data-mode="destruct"] :is(#panel-detect, #panel-type, #panel-sound, #panel-doorsettings, #panel-presets, #panel-pivot, #btn-soundonly) { display: none !important; }
+body[data-mode="anim"] #ds-type, body[data-mode="destruct"] #ds-type { pointer-events: none; }
+/* DOOR SOUND as its own page */
+#so-modal.as-page { inset: 46px 0 0 0; background: radial-gradient(1000px 500px at 50% -10%, #2a1245 0%, transparent 60%), var(--bg0); z-index: 190; align-items: flex-start; padding-top: 40px; overflow: auto; }
+#so-modal.as-page .modal-box { width: min(720px, 92vw); box-shadow: 0 20px 60px #000c, 0 0 0 1px #a855f744; }
