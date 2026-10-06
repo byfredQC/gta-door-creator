@@ -404,3 +404,11 @@ body[data-mode] .brand-sub { display: none; }
 #btn-settings { padding: 4px 8px; }
 #topbar .steps li { white-space: nowrap; }
 @media (max-width: 1700px) { body[data-mode="door"] .steps li { font-size: 10px; padding-left: 6px; padding-right: 10px; } }
+
+.ytyp-target { display: flex; align-items: center; gap: 8px; margin: 6px 0 4px; }
+.ytyp-target .lbl { margin: 0; min-width: 34px; }
+.ytyp-target .seg { flex: 1; }
+.ytyp-target .seg button { padding: 4px; font-size: 10.5px; }
+.ytyp-mine { display: flex; align-items: center; justify-content: space-between; gap: 6px; font: 11px var(--mono); color: var(--accent2); background: var(--bg0); border: 1px solid var(--line2); border-radius: 5px; padding: 4px 6px; margin-bottom: 4px; }
+.ytyp-mine.hidden { display: none; }
+.ytyp-mine span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

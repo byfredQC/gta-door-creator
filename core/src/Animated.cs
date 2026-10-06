@@ -211,11 +211,11 @@ namespace DoorCore
                 var ytypName = Exporter.San((string)y["ytypName"] ?? name);
                 var arch = Exporter.San((string)y["archetypeName"] ?? name);
                 var xml = BuildYtypXml(ytypName, arch, name, dict, y, sMin, sMax, centre, radius);
-                var doc = new XmlDocument(); doc.LoadXml(xml);
-                var data = XmlMeta.GetData(doc, MetaFormat.RSC, "") ?? throw new Exception("YTYP build failed");
-                var p = Path.Combine(outDir, ytypName + ".ytyp");
+                var (data, outName) = YtypMerge.Build(xml, ytypName, y, warnings);
+                var p = Path.Combine(outDir, outName + ".ytyp");
                 File.WriteAllBytes(p, data);
                 files.Add(p);
+                info["ytypFile"] = outName + ".ytyp";
                 VerifyYtyp(data, arch, name, dict, warnings);
                 if ((bool?)req["writeXml"] ?? false) File.WriteAllText(p + ".xml", xml);
             }
@@ -526,7 +526,7 @@ namespace DoorCore
         static void VerifyYtyp(byte[] data, string arch, string model, string dict, JsonArray warnings)
         {
             var y = new YtypFile(); y.Load(data);
-            var a = y.AllArchetypes?.FirstOrDefault() ?? throw new Exception("YTYP check failed");
+            var a = y.AllArchetypes?.FirstOrDefault(x => x._BaseArchetypeDef.name.Hash == JenkHash.GenHash(arch)) ?? throw new Exception("YTYP check failed");
             var b = a._BaseArchetypeDef;
             if (b.assetType != rage__fwArchetypeDef__eAssetType.ASSET_TYPE_FRAGMENT) throw new Exception("YTYP check failed: asset type");
             if (b.clipDictionary.Hash != JenkHash.GenHash(dict)) throw new Exception("YTYP check failed: clip dictionary");

@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('api', {
   splitPreview: inv('core:splitPreview'),
   openPropDialog: inv('dialog:openProp'),
   openYbnDialog: inv('dialog:openYbn'),
+  openYtypDialog: inv('dialog:openYtyp'),
   chooseFolder: inv('dialog:chooseFolder'),
   saveProjectDialog: inv('dialog:saveProject'),
   openProjectDialog: inv('dialog:openProject'),

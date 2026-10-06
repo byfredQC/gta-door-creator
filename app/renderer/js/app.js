@@ -191,7 +191,8 @@ function archetype() {
   return {
     archetypeName: D.sanitizeName(y.archetypeName || d.name),
     modelName: D.sanitizeName(y.modelName || d.name),
-    ytypName: D.sanitizeName(y.ytypName || d.name),
+    ytypName: y.mergePath ? basename(y.mergePath).replace(/\.ytyp$/i, '') : D.sanitizeName(y.ytypName || d.name),
+    mergePath: y.mergePath || null,
     lodDist: Number(y.lodDist), hdTextureDist: Number(y.hdTextureDist),
     flags: y.flagsAuto ? D.recommendedFlags(d) : Number(y.flags),
     specialAttribute: sa,
@@ -871,6 +872,10 @@ ${K('Sound:')}
 // ------------------------------------------------------------------ export
 function refreshExport() {
   const d = S.door;
+  seg('ytyp-target', 'yt', d.ytyp.mergePath ? 'mine' : 'new');
+  $('ytyp-mine').classList.toggle('hidden', !d.ytyp.mergePath);
+  $('ytyp-mine-name').textContent = d.ytyp.mergePath ? '+ ' + basename(d.ytyp.mergePath) : '';
+  $('ytyp-mine-name').title = d.ytyp.mergePath || '';
   $('out-folder').textContent = d.export.folder || 'No output folder';
   $('out-folder').title = d.export.folder || '';
   $('ex-streamybn').checked = !!d.export.streamYbn;
@@ -910,6 +915,7 @@ function exportJob(outDir, outputs) {
     ytyp: {
       ytypName: a.ytypName, archetypeName: a.archetypeName, assetName: a.modelName, lodDist: a.lodDist, hdTextureDist: a.hdTextureDist,
       flags: a.flags, specialAttribute: a.specialAttribute, textureDictionary: a.textureDictionary, physicsDictionary: a.archetypeName,
+      mergeInto: a.mergePath || undefined,
     },
     destruct: a.destruct ? { pieces: S.door.destruct.pieces, seed: S.door.destruct.seed, strength: D.DESTRUCT_STRENGTH[S.door.destruct.strength], anchored: S.door.destruct.anchored !== false, collision: S.door.destruct.collision || 'mesh' } : undefined,
     anim: a.anim ? (() => {
@@ -927,6 +933,7 @@ async function doExport(outputs, label) {
     log(`› ${label}…`);
     const res = await api.exportFiles(exportJob(dir, outputs));
     for (const f of res.files) log(`  ✓ ${f}`, 'ok');
+    if (archetype().mergePath) log(`  ⚠ ${archetype().ytypName}.ytyp = YOUR ytyp + this prop. Use it in place of your original (MLO resource) - never stream both. A .bak copy of your file was kept.`, 'w');
     if (outputs.ydr && outputs.ytyp && S.door.type === 'destruct') {
       log('  ⧉ Put the .yft + .ytyp in stream/ + the data_file line (COPY FXMANIFEST): it breaks by itself, no script', 'w');
     } else if (outputs.ydr && outputs.ytyp && D.isAnim(S.door)) {
@@ -987,6 +994,7 @@ async function exportFiveM() {
     if (audio) log(`  ✓ audio/${audio.file}  (sound: ${audio.label})`, 'ok');
     const files = buildResource({ door: S.door, an: S.an, pivot: pivot(), resourceName: resName, ytypFile: a.ytypName + '.ytyp', streamFiles, withScript, anim: a.anim, destruct: destruct ? { pieces: res.archetype?.pieces ?? S.door.destruct.pieces, strength: D.DESTRUCT_STRENGTH[S.door.destruct.strength], anchored: S.door.destruct.anchored !== false } : null, modelName: a.modelName, audioFile: audio && audio.file, soundLabel: audio && audio.label });
     for (const [fname, text] of Object.entries(files)) { await api.writeText(joinPath(root, fname), text); log(`  ✓ ${fname}`, 'ok'); }
+    if (archetype().mergePath) log(`  ⚠ ${archetype().ytypName}.ytyp = YOUR ytyp + this prop. Use it in place of your original (MLO resource) - never stream both. A .bak copy of your file was kept.`, 'w');
     for (const w of res.warnings || []) log(`  ! ${w}`, 'w');
     S.ytypGenerated = true; S.exported = true; refreshYtyp(); refreshSteps();
     toast(`FiveM resource "${resName}" ready`, 'ok');
@@ -1307,6 +1315,12 @@ function bind() {
   $('btn-genytyp').onclick = () => doExport({ ydr: false, ytyp: true, ybn: false }, 'Generate YTYP');
 
   // export
+  const pickMyYtyp = async () => {
+    const p = await api.openYtypDialog();
+    if (p) { S.door.ytyp.mergePath = p; touch(); toast(`The archetype will be added to ${basename(p)} (a .bak copy of your file is kept)`, 'ok'); }
+  };
+  $$('[data-yt]').forEach((b) => b.onclick = () => { if (b.dataset.yt === 'new') { S.door.ytyp.mergePath = null; touch(); } else pickMyYtyp(); });
+  $('ytyp-mine-change').onclick = pickMyYtyp;
   $('btn-outfolder').onclick = async () => { const f = await api.chooseFolder('Choose the export folder'); if (f) { S.door.export.folder = f; S.settings.outFolder = f; api.saveSettings(S.settings); refreshExport(); setDirty(); } };
   $('ex-ydr').onclick = () => doExport({ ydr: true, ytyp: false, ybn: false }, 'Export YDR');
   $('ex-ytyp').onclick = () => doExport({ ydr: false, ytyp: true, ybn: false }, 'Export YTYP');

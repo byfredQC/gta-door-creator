@@ -21,6 +21,9 @@ class Core {
       path.join(__dirname, '..', 'core', 'bin', 'out'),
       path.join(__dirname, '..', 'core', 'bin', 'Release', 'net8.0'),
     ];
+    // hot-fix engine dropped next to the installed one (framework-dependent build, needs the .NET 8 runtime)
+    const upd = path.join(process.resourcesPath || '', 'core', 'update');
+    if (fs.existsSync(path.join(upd, 'DoorCore.dll'))) return { cmd: 'dotnet', args: [path.join(upd, 'DoorCore.dll')], dir: upd };
     for (const dir of candidates) {
       const exe = path.join(dir, process.platform === 'win32' ? 'DoorCore.exe' : 'DoorCore');
       const dll = path.join(dir, 'DoorCore.dll');

@@ -83,12 +83,11 @@ namespace DoorCore
                 var ytypName = San((string)y["ytypName"] ?? (name + "_types"));
                 var arch = San((string)y["archetypeName"] ?? name);
                 var xml = BuildYtypXml(ytypName, arch, y, bbMin, bbMax, centre, radius, d);
-                var doc = new XmlDocument(); doc.LoadXml(xml);
-                var data = XmlMeta.GetData(doc, MetaFormat.RSC, "");
-                if (data == null) throw new Exception("YTYP build failed");
-                var p = Path.Combine(outDir, ytypName + ".ytyp");
+                var (data, outName) = YtypMerge.Build(xml, ytypName, y, warnings);
+                var p = Path.Combine(outDir, outName + ".ytyp");
                 File.WriteAllBytes(p, data);
                 files.Add(p);
+                info["ytypFile"] = outName + ".ytyp";
                 if ((bool?)req["writeXml"] ?? false) File.WriteAllText(p + ".xml", xml);
             }
             return new JsonObject { ["files"] = files, ["archetype"] = info, ["warnings"] = warnings };

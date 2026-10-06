@@ -87,6 +87,10 @@ ipcMain.handle('dialog:openProp', async () => {
   const r = await dialog.showOpenDialog(win, { title: 'Import GTA prop', properties: ['openFile', 'multiSelections'], filters: PROP_FILTERS });
   return r.canceled ? [] : r.filePaths;
 });
+ipcMain.handle('dialog:openYtyp', async () => {
+  const r = await dialog.showOpenDialog(win, { title: 'Choose your .ytyp (the archetype will be added to it)', properties: ['openFile'], filters: [{ name: 'YTYP', extensions: ['ytyp'] }] });
+  return r.canceled ? null : r.filePaths[0];
+});
 ipcMain.handle('dialog:openYbn', async () => {
   const r = await dialog.showOpenDialog(win, { title: 'Import collision (YBN)', properties: ['openFile'], filters: [{ name: 'Collision', extensions: ['ybn'] }] });
   return r.canceled ? null : r.filePaths[0];

@@ -336,19 +336,21 @@ namespace DoorCore
             finally { try { Directory.Delete(texDir, true); } catch { } }
 
             var centre = (bbMin + bbMax) * 0.5f; var radius = (bbMax - bbMin).Length() * 0.5f;
+            string ytypOut = null;
             if (wantYtyp)
             {
                 var ytypName = Exporter.San((string)y["ytypName"] ?? name);
                 var arch = Exporter.San((string)y["archetypeName"] ?? name);
                 uint flags = (uint?)y["flags"] ?? (FlagsBreakable | (anchored ? FlagStatic : 0));
                 var xml = YtypXml(ytypName, arch, name, y, flags, bbMin, bbMax, centre, radius);
-                var doc = new XmlDocument(); doc.LoadXml(xml);
-                var data = XmlMeta.GetData(doc, MetaFormat.RSC, "") ?? throw new Exception("YTYP build failed");
-                var p = Path.Combine(outDir, ytypName + ".ytyp");
+                var (data, outName) = YtypMerge.Build(xml, ytypName, y, warnings);
+                var p = Path.Combine(outDir, outName + ".ytyp");
                 File.WriteAllBytes(p, data);
                 files.Add(p);
+                ytypOut = outName + ".ytyp";
             }
             var info = new JsonObject { ["bbMin"] = Util.V3(bbMin), ["bbMax"] = Util.V3(bbMax), ["bsCentre"] = Util.V3(centre), ["bsRadius"] = Util.R(radius), ["pieces"] = pieceCount };
+            if (ytypOut != null) info["ytypFile"] = ytypOut;
             return new JsonObject { ["files"] = files, ["archetype"] = info, ["warnings"] = warnings };
         }
 
