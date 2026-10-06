@@ -58,6 +58,12 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.ico",
@@ -83,7 +89,10 @@
       "uninstallerIcon": "build/icon.ico",
       "artifactName": "GTA-Door-Creator-Setup-${version}.${ext}"
     },
-    "artifactName": "GTA-Door-Creator-${version}-${os}-${arch}.${ext}"
+    "artifactName": "GTA-Door-Creator-${version}-${os}-${arch}.${ext}",
+    "portable": {
+      "artifactName": "GTA-Door-Creator-${version}.exe"
+    }
   },
   "homepage": "https://github.com/byfredQC/gta-door-creator",
   "repository": {
