@@ -32,8 +32,8 @@ namespace DoorCore
         const string PropTypeFlags = "OBJECT";
         const string PropIncludeFlags = "MAP_WEAPON, MAP_DYNAMIC, MAP_ANIMAL, MAP_COVER, MAP_VEHICLE, VEHICLE_NOT_BVH, VEHICLE_BVH, PED, RAGDOLL, ANIMAL, ANIMAL_RAGDOLL, OBJECT, PLANT, PROJECTILE, EXPLOSION, FORKLIFT_FORKS, TEST_WEAPON, TEST_CAMERA, TEST_AI, TEST_SCRIPT, TEST_VEHICLE_WHEEL, GLASS";
 
-        static string F(float f) => f.ToString("R", CultureInfo.InvariantCulture);
-        static string V(string tag, Vector3 v) => $"<{tag} x=\"{F(v.X)}\" y=\"{F(v.Y)}\" z=\"{F(v.Z)}\" />";
+        internal static string F(float f) => f.ToString("R", CultureInfo.InvariantCulture);
+        internal static string V(string tag, Vector3 v) => $"<{tag} x=\"{F(v.X)}\" y=\"{F(v.Y)}\" z=\"{F(v.Z)}\" />";
 
         // ------------------------------------------------------------------ motion
         public class Motion
@@ -236,11 +236,11 @@ namespace DoorCore
         }
 
         // ------------------------------------------------------------------ .yft
-        static string Mat43(Vector3 t) => $"1 0 0\n0 1 0\n0 0 1\n{F(t.X)} {F(t.Y)} {F(t.Z)}";
+        internal static string Mat43(Vector3 t) => $"1 0 0\n0 1 0\n0 0 1\n{F(t.X)} {F(t.Y)} {F(t.Z)}";
 
-        static Vector3 BoxInertia(Vector3 s, float m) => new Vector3(m * (s.Y * s.Y + s.Z * s.Z) / 12f, m * (s.X * s.X + s.Z * s.Z) / 12f, m * (s.X * s.X + s.Y * s.Y) / 12f);
+        internal static Vector3 BoxInertia(Vector3 s, float m) => new Vector3(m * (s.Y * s.Y + s.Z * s.Z) / 12f, m * (s.X * s.X + s.Z * s.Z) / 12f, m * (s.X * s.X + s.Y * s.Y) / 12f);
 
-        static string BoxChild(Vector3 mn, Vector3 mx, int mat)
+        internal static string BoxChild(Vector3 mn, Vector3 mx, int mat)
         {
             var s = mx - mn; var h = s * 0.5f; var c = (mn + mx) * 0.5f;
             float margin = Math.Min(0.04f, Math.Max(0.005f, Math.Min(s.X, Math.Min(s.Y, s.Z)) * 0.25f));
@@ -355,7 +355,7 @@ namespace DoorCore
                 bone(name, 0, 0, -1, rootFlags) + bone("door", tag, 1, 0, doorFlags) + "</Bones></Skeleton>";
         }
 
-        static uint Crc32(string s)
+        internal static uint Crc32(string s)
         {
             uint crc = 0xFFFFFFFF;
             foreach (var b in Encoding.UTF8.GetBytes(s))

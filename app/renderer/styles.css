@@ -135,8 +135,9 @@ kbd { font: 11px var(--mono); color: var(--text3); }
 .why { font-size: 11px; color: var(--text3); margin-top: 6px; }
 
 /* type buttons */
-.type-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.type-grid .type-btn { font-size: 10px; }
+.type-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.type-grid .type-btn { font-size: 9px; padding: 10px 2px 8px; letter-spacing: .02em; }
+.type-grid .ti { width: 36px; height: 36px; }
 .type-btn { background: var(--bg3); border: 1.5px solid var(--line2); border-radius: 7px; padding: 12px 4px 9px; cursor: pointer;
   font: 700 11.5px var(--font-head); letter-spacing: .08em; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .type-btn:hover { border-color: #5b4a78; }
@@ -328,3 +329,8 @@ body.dragging .drop-overlay { display: flex; }
 .kf-row .del:disabled { visibility: hidden; }
 .kf-row input::-webkit-outer-spin-button, .kf-row input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .kf-row input { -moz-appearance: textfield; padding: 4px 2px; font-size: 10.5px; }
+
+/* destructible */
+.ti-destruct::before { left: 5px; top: 8px; width: 12px; height: 10px; border: 2px solid currentColor; transform: rotate(-12deg); box-shadow: 15px 3px 0 -2px currentColor, 4px 15px 0 -2px currentColor; }
+.ti-destruct::after { left: 21px; top: 20px; width: 9px; height: 9px; border: 2px solid currentColor; transform: rotate(25deg); }
+#panel-settings[data-type="destruct"] .not-custom { display: none; }

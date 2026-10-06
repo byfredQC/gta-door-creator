@@ -44,6 +44,7 @@ export function defaultDoor() {
     sound: { mode: 'auto', id: null },
     ytyp: { archetypeName: '', modelName: '', ytypName: '', lodDist: 100, hdTextureDist: 15, flags: FLAG_DYNAMIC | FLAG_DOOR_PHYSICS, flagsAuto: true, textureDictionary: null },
     export: { folder: null, streamYbn: false, withScript: false },
+    destruct: { pieces: 12, seed: 1, strength: 'normal', anchored: true },
     custom: { interp: 'linear', keys: [{ t: 0, r: [0, 0, 0], p: [0, 0, 0] }, { t: 4, r: [0, 0, 360], p: [0, 0, 0] }] },
   };
 }
@@ -192,7 +193,8 @@ export function autoDetect(model, an) {
 }
 
 // ---------------------------------------------------------------- motion
-export function duration(door) { return door.type === 'custom' ? customDuration(door) : (SPEEDS[door.type]?.[door.speed] ?? 1.5); }
+export const DESTRUCT_STRENGTH = { fragile: 50, normal: 300, solid: 1500, verysolid: 5000 };
+export function duration(door) { if (door.type === 'destruct') return 2.5; return door.type === 'custom' ? customDuration(door) : (SPEEDS[door.type]?.[door.speed] ?? 1.5); }
 
 // ---------------------------------------------------------------- custom animation (whole object, keyframes)
 // keys: { t seconds, r [x,y,z] degrees (any value, 360 = one turn), p [x,y,z] metres } relative to the pivot
@@ -278,6 +280,7 @@ export function motionSpec(door, an, pivot) {
   const P = [pivot.x, pivot.y, pivot.z];
   const spec = { axis: [0, 0, 1], angle: 0, center: [0, 0, 0], offset: [0, 0, 0], kind: 'none' };
   if (door.type === 'custom') { spec.kind = 'custom'; return spec; }
+  if (door.type === 'destruct') { spec.kind = 'destruct'; return spec; }
   if (door.type === 'normal') {
     spec.kind = 'rotate';
     spec.angle = swingSign(door, an, pivot) * door.normal.angle;
@@ -333,6 +336,7 @@ export function panelLayout(door, an) {
 // ---------------------------------------------------------------- archetype helpers
 export const FLAGS_ANIM_FRAGMENT = 537526816; // vanilla animated fragment (Has Anim + Dynamic + Auto Start Anim + Use Ambient Scale) + Static
 export function recommendedFlags(door) {
+  if (door.type === 'destruct') return 536870912 + 131072 + (door.destruct?.anchored === false ? 0 : 32); // ambient scale + dynamic (+ static)
   if (door.engine === 'ycd') return FLAGS_ANIM_FRAGMENT;
   return door.engine === 'native' ? (FLAG_DYNAMIC | FLAG_DOOR_PHYSICS) : FLAG_DYNAMIC;
 }
@@ -345,7 +349,7 @@ export function specialAttribute(door) {
   // roll-up / lift doors behave like vanilla shutters (Sliding Vertical Door), sectional = Garage Door
   return door.garage.kind === 'sectional' ? SPECIAL_ATTR.garage : SPECIAL_ATTR.slidingVertical;
 }
-export function defaultEngine(type) { return type === 'custom' ? 'ycd' : 'native'; } // GTA door system, no script needed
+export function defaultEngine(type) { return type === 'custom' ? 'ycd' : type === 'destruct' ? 'destruct' : 'native'; } // GTA door system, no script needed
 
 export function sanitizeName(s) {
   return (s || 'door').toLowerCase().trim().replace(/\.(ydr|ytyp|ybn|ytd)$/, '').replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || 'door';

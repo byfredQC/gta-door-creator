@@ -46,6 +46,7 @@ export class Viewer {
     this.meshGroup = new THREE.Group(); this.doorBody.add(this.meshGroup);
     this.colGroup = new THREE.Group(); this.doorBody.add(this.colGroup);
     this.panelGroup = new THREE.Group(); this.root.add(this.panelGroup);
+    this.shardGroup = new THREE.Group(); this.root.add(this.shardGroup); this.shards = [];
     this.helpers = new THREE.Group(); this.root.add(this.helpers);
     this.pivotMarker = this.makePivotMarker(); this.pivotMarker.visible = false; this.root.add(this.pivotMarker);
 
@@ -141,6 +142,7 @@ export class Viewer {
 
   // ---------------------------------------------------------------- model
   clearModel() {
+    this.clearShards();
     for (const grp of [this.meshGroup, this.ghost, this.panelGroup, this.colGroup, this.helpers]) {
       grp.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
       grp.clear();
@@ -255,6 +257,7 @@ export class Viewer {
 
     // garage panels
     this.buildPanels(door, an, pivot);
+    this.applyShardVisibility();
     this.setOpen(this.t);
   }
 
@@ -336,6 +339,49 @@ export class Viewer {
     }
   }
 
+  // ---------------------------------------------------------------- destructible pieces (preview of the break)
+  clearShards() {
+    this.shardGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.dispose) o.material.dispose(); });
+    this.shardGroup.clear(); this.shards = [];
+  }
+  setShards(pieces) {
+    this.clearShards();
+    if (!pieces || !this.model) { this.applyShardVisibility(); return; }
+    const an = this.an || { center: [0, 0, 0], size: [1, 1, 1] };
+    const c0 = new THREE.Vector3(...an.center);
+    let seed = 1; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    pieces.forEach((pc, i) => {
+      const center = new THREE.Vector3(...pc.center);
+      const outer = new THREE.Group(); outer.position.copy(center);
+      const inner = new THREE.Group(); inner.position.copy(center).negate(); outer.add(inner);
+      const hue = (i * 0.618034) % 1;
+      for (const part of pc.parts) {
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(b64ToF32(part.positions), 3));
+        if (part.uvs) g.setAttribute('uv', new THREE.BufferAttribute(b64ToF32(part.uvs), 2));
+        g.computeVertexNormals();
+        const m = this.materialFor(part.shaderIndex);
+        if (this.shading !== 'material' || !m.map) m.color = new THREE.Color().setHSL(hue, 0.45, 0.6);
+        inner.add(new THREE.Mesh(g, m));
+        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(g, 40), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 }));
+        inner.add(edges);
+      }
+      const dir = center.clone().sub(c0); if (dir.lengthSq() < 1e-6) dir.set(rnd() - 0.5, rnd() - 0.5, 0.2);
+      dir.normalize();
+      const axis = new THREE.Vector3(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).normalize();
+      this.shardGroup.add(outer);
+      this.shards.push({ outer, center, dir, axis, spin: 1.5 + rnd() * 2.5, speed: 1.2 + rnd() * 1.6 });
+    });
+    this.applyShardVisibility();
+    this.setOpen(this.t);
+  }
+  applyShardVisibility() {
+    const on = !!(this.door && this.door.created && this.door.type === 'destruct' && this.shards.length);
+    this.shardGroup.visible = on;
+    if (on) this.doorPivot.visible = false;
+    else if (!this.panels.length) this.doorPivot.visible = true;
+  }
+
   updatePanelClipping() {
     for (const p of this.panels) {
       p.group.updateMatrixWorld(true);
@@ -364,6 +410,16 @@ export class Viewer {
           .multiply(new THREE.Matrix4().makeRotationAxis(axis, tp.phi))
           .multiply(new THREE.Matrix4().makeTranslation(-B.x, -B.y, -B.z));
         p.group.matrix.copy(m);
+      }
+      return;
+    }
+    if (door.type === 'destruct') {
+      // break preview: every piece flies away from the centre, spins and falls
+      const size = Math.max(...an.size), g = 9.81 * 0.35;
+      for (const s of this.shards) {
+        const tt = t * 1.6;
+        s.outer.position.copy(s.center).addScaledVector(s.dir, s.speed * tt * size * 0.35).add(new THREE.Vector3(0, 0, (1.2 * tt - g * tt * tt) * Math.min(1, size * 0.3)));
+        s.outer.quaternion.setFromAxisAngle(s.axis, s.spin * tt);
       }
       return;
     }

@@ -88,6 +88,7 @@
         <button class="type-btn" data-type="normal"><span class="ti ti-normal"></span>NORMAL DOOR</button>
         <button class="type-btn" data-type="sliding"><span class="ti ti-sliding"></span>SLIDING DOOR</button>
         <button class="type-btn" data-type="garage"><span class="ti ti-garage"></span>GARAGE DOOR</button>
+        <button class="type-btn" data-type="destruct" title="Breaks into pieces in-game (explosions, impacts, bullets) with real GTA physics - no script"><span class="ti ti-destruct"></span>DESTRUCT</button>
         <button class="type-btn" data-type="custom" title="Any prop: a logo that spins, a sign that swings... loops by itself in-game (no script)"><span class="ti ti-custom"></span>CUSTOM ANIM</button>
       </div>
     </section>
@@ -145,6 +146,21 @@
         </div>
         <div class="g-sect panels" id="panel-list"></div>
         <label class="check g-sect-check"><input type="checkbox" id="in-ingame" /> Preview the in-game motion <span class="muted" id="ingame-note"></span></label>
+      </div>
+
+      <!-- DESTRUCTIBLE -->
+      <div class="type-settings" data-for="destruct">
+        <label class="lbl">Pieces <b id="v-pieces">12</b></label>
+        <input type="range" id="in-pieces" min="2" max="40" step="1" value="12" />
+        <div class="ticks"><span>2</span><span>10</span><span>20</span><span>30</span><span>40</span></div>
+        <div class="row2"><button class="btn" id="btn-recut" title="Cut the model in a different way">↻ NEW CUT</button><button class="btn" id="btn-breakprev" title="Play the break">💥 PREVIEW BREAK</button></div>
+        <label class="lbl">Strength <span class="muted">(force needed to break a piece)</span></label>
+        <div class="seg four" id="des-strength">
+          <button data-ds="fragile" title="50 - breaks with bullets / bumps">FRAGILE</button><button data-ds="normal" title="300 - breaks with cars and explosions">NORMAL</button>
+          <button data-ds="solid" title="1500 - needs a big explosion or a heavy vehicle">SOLID</button><button data-ds="verysolid" title="5000 - only very big hits">VERY SOLID</button>
+        </div>
+        <label class="check"><input type="checkbox" id="in-anchored" checked /> Anchored <span class="muted">(stays in place until it breaks - bridges, walls)</span></label>
+        <div class="hint" id="des-info"></div>
       </div>
 
       <!-- CUSTOM ANIMATION -->
@@ -236,7 +252,7 @@
       <h2>DOOR SETTINGS</h2>
       <div class="form">
         <label>Name<input type="text" id="ds-name" spellcheck="false" /></label>
-        <label>Type<select id="ds-type"><option value="normal">Normal</option><option value="sliding">Sliding</option><option value="garage">Garage</option><option value="custom">Custom animation</option></select></label>
+        <label>Type<select id="ds-type"><option value="normal">Normal</option><option value="sliding">Sliding</option><option value="garage">Garage</option><option value="destruct">Destructible</option><option value="custom">Custom animation</option></select></label>
         <label>Direction<select id="ds-dir"></select></label>
         <label>Pivot<input type="text" id="ds-pivot" readonly /></label>
         <label>Opening Angle<input type="number" id="ds-angle" min="0" max="180" /></label>

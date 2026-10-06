@@ -19,6 +19,7 @@ namespace DoorCore
         public static JsonNode Export(JsonObject req)
         {
             if (req["anim"] is JsonObject) return Animated.Export(req);
+            if (req["destruct"] is JsonObject) return Destruct.Export(req);
             var src = (string)req["source"];
             var outDir = (string)req["outDir"];
             var name = San((string)req["name"] ?? Path.GetFileNameWithoutExtension(src));

@@ -64,7 +64,7 @@ viewer.onFrame = (dt) => {
   const p = S.preview;
   if (p.playing && S.door.created) {
     const dur = D.duration(S.door);
-    if (S.door.type === 'custom') {   // custom animations play forward and wrap, like in-game
+    if (S.door.type === 'custom' || S.door.type === 'destruct') {   // play forward (and wrap when looping)
       p.t += dt / dur;
       if (p.t >= 1) { if (p.loop) p.t %= 1; else { p.t = 1; p.playing = false; } }
       applyPreview(); return;
@@ -87,6 +87,10 @@ function applyPreview() {
 function updateReadout() {
   const d = S.door, an = S.an;
   if (!S.model || !d.created) { $('pv-readout').textContent = '–'; return; }
+  if (d.type === 'destruct') {
+    $('pv-readout').textContent = `${S.shards?.pieces?.length ?? d.destruct.pieces} pieces · strength ${d.destruct.strength} · break preview`;
+    return;
+  }
   if (d.type === 'custom') {
     const dur = D.customDuration(d), pose = D.customPose(d, S.preview.t * dur);
     $('pv-readout').textContent = `${(S.preview.t * dur).toFixed(2)} / ${dur.toFixed(2)} s · rot ${pose.r.map((v) => v.toFixed(0)).join(' ')}° · loop`;
@@ -191,7 +195,8 @@ function archetype() {
     lodDist: Number(y.lodDist), hdTextureDist: Number(y.hdTextureDist),
     flags: y.flagsAuto ? D.recommendedFlags(d) : Number(y.flags),
     specialAttribute: sa,
-    textureDictionary: D.isAnim(d) ? '' : (y.textureDictionary ?? (S.model.hasEmbeddedTextures ? D.sanitizeName(y.modelName || d.name) : '')),
+    destruct: d.type === 'destruct',
+    textureDictionary: D.isAnim(d) || d.type === 'destruct' ? '' : (y.textureDictionary ?? (S.model.hasEmbeddedTextures ? D.sanitizeName(y.modelName || d.name) : '')),
     bounds: b,
     anim: !D.isAnim(d) ? null : d.type === 'custom'
       ? { dict: D.sanitizeName(y.modelName || d.name) + '_anim', clip: D.sanitizeName(y.archetypeName || d.name), auto: true }
@@ -224,7 +229,7 @@ async function loadPaths(paths) {
 
 async function onYdr(res, keepDoor = null) {
   for (const m of res.meshes) m._pos = b64ToF32(m.positions);
-  S.model = res; S.hullCache = null;
+  S.model = res; S.hullCache = null; S.shards = null;
   S.an = D.analyzeModel(res);
   S.ybn = keepDoor ? S.ybn : null;
   if (keepDoor) S.door = keepDoor;
@@ -329,6 +334,7 @@ function createDoor(announce = true) {
 function setType(type) {
   const d = S.door;
   if (d.type !== type) { d.engine = D.defaultEngine(type); d.export.withScript = false; }
+  if (type !== 'destruct') viewer.setShards(null); else if (S.shards && S.shards.key === shardKey()) viewer.setShards(S.shards.pieces);
   d.type = type; d.typeChosen = true;
   if (d.pivot.mode !== 'custom') d.pivot.mode = 'auto';
   S.preview.t = 0; S.preview.playing = false;
@@ -468,10 +474,11 @@ function refresh() {
   // type + settings
   for (const b of $$('.type-btn')) b.classList.toggle('on', created && d.typeChosen && b.dataset.type === d.type);
   for (const el of $$('.type-settings')) el.classList.toggle('on', el.dataset.for === d.type);
-  $('settings-tag').textContent = d.type === 'garage' ? `GARAGE · ${d.garage.kind.toUpperCase()}` : d.type === 'custom' ? 'CUSTOM ANIMATION' : d.type.toUpperCase();
+  $('settings-tag').textContent = d.type === 'garage' ? `GARAGE · ${d.garage.kind.toUpperCase()}` : d.type === 'custom' ? 'CUSTOM ANIMATION' : d.type === 'destruct' ? `DESTRUCTIBLE · ${d.destruct.pieces} PIECES` : d.type.toUpperCase();
   $('panel-settings').dataset.gkind = d.type === 'garage' ? d.garage.kind : '';
   $('panel-settings').dataset.type = d.type;
   if (d.type === 'custom') refreshCustom();
+  if (d.type === 'destruct') refreshDestruct();
   seg('panel-settings', 'hinge', d.normal.hinge);
   $('in-angle').value = d.normal.angle; $('v-angle').textContent = d.normal.angle + '°';
   seg('panel-settings', 'sdir', d.sliding.dir);
@@ -558,8 +565,38 @@ function updateAnimInfo() {
     (big ? '<br><span class="muted">Tip: more than 180° between two keys is fine (360° spins work).</span>' : '');
 }
 
+// ------------------------------------------------------------------ DESTRUCTIBLE panel
+let shardTimer = null;
+function refreshDestruct() {
+  const d = S.door, ds = d.destruct;
+  if (document.activeElement !== $('in-pieces')) $('in-pieces').value = ds.pieces;
+  $('v-pieces').textContent = ds.pieces;
+  seg('des-strength', 'ds', ds.strength);
+  $('in-anchored').checked = ds.anchored !== false;
+  const got = S.shards && S.shards.key === shardKey() ? S.shards : null;
+  $('des-info').innerHTML = (got ? `<b>${got.pieces.length} pieces</b> (${got.triangles.toLocaleString()} triangles after cutting) · ` : 'Cutting… · ') +
+    `strength ${D.DESTRUCT_STRENGTH[ds.strength]}. In-game every piece breaks off by itself when an explosion, a vehicle or bullets hit it hard enough, then falls with real GTA physics - <b>no script</b>. Collision = one box per piece (material from COLLISION).`;
+  if (!got) requestShards();
+}
+function shardKey() { return `${S.model?.path}|${S.door.destruct.pieces}|${S.door.destruct.seed}`; }
+function requestShards() {
+  clearTimeout(shardTimer);
+  shardTimer = setTimeout(async () => {
+    if (!S.model || S.door.type !== 'destruct') return;
+    const key = shardKey();
+    if (S.shards && S.shards.key === key) return;
+    try {
+      const res = await api.splitPreview(S.model.path, S.door.destruct.pieces, S.door.destruct.seed);
+      if (key !== shardKey()) return;
+      S.shards = { key, pieces: res.pieces, triangles: res.triangles };
+      viewer.setShards(res.pieces);
+      refreshDestruct(); updateReadout();
+    } catch (e) { toast('Cut failed: ' + e.message, 'err'); }
+  }, 250);
+}
+
 function engineHint(d) {
-  if (d.type === 'custom') return '';
+  if (d.type === 'custom' || d.type === 'destruct') return '';
   if (d.engine === 'ycd') return 'ANIMATED .YCD: the export makes a GTA animated fragment (.yft) + its open/close clips (.ycd) + an expression (.yed) so the COLLISION FOLLOWS the animation. A small Lua plays the clips with E, synced for every player. No GTA door sound in this mode.';
   if (d.engine === 'scripted') return 'SCRIPTED: the export adds client/server Lua that plays exactly this preview (angle, distance, speed), synced for every player (E in-game).';
   if (d.type === 'normal') return 'NATIVE (default, no script): GTA door system - a physics door players push open. Collision is embedded in the .ydr. Angle & speed only apply in SCRIPTED mode.';
@@ -578,10 +615,10 @@ function fillDoorSettings() {
   const dir = $('ds-dir');
   const opts = d.type === 'normal' ? [['left', 'Left (hinge)'], ['right', 'Right (hinge)'], ['left-flip', 'Left · flipped'], ['right-flip', 'Right · flipped']]
     : d.type === 'sliding' ? [['left', '← Left'], ['right', 'Right →'], ['up', '↑ Up'], ['down', '↓ Down']]
-      : d.type === 'custom' ? [['loop', 'Loop (auto, no script)']]
+      : d.type === 'custom' ? [['loop', 'Loop (auto, no script)']] : d.type === 'destruct' ? [['pieces', 'Breaks in pieces']]
       : [['sliding', 'Garage sliding'], ['rollup', 'Garage roll up'], ['sectional', 'Garage sectional']];
   dir.innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
-  dir.value = d.type === 'normal' ? d.normal.hinge + (d.normal.flip ? '-flip' : '') : d.type === 'sliding' ? d.sliding.dir : d.type === 'custom' ? 'loop' : d.garage.kind;
+  dir.value = d.type === 'normal' ? d.normal.hinge + (d.normal.flip ? '-flip' : '') : d.type === 'sliding' ? d.sliding.dir : d.type === 'custom' ? 'loop' : d.type === 'destruct' ? 'pieces' : d.garage.kind;
   const P = pivot();
   $('ds-pivot').value = `${d.pivot.mode.toUpperCase()}  ${D.fmt(P.x, 2)}, ${D.fmt(P.y, 2)}, ${D.fmt(P.z, 2)}`;
   $('ds-angle').value = d.normal.angle;
@@ -633,7 +670,7 @@ function ytypXml(a) {
    ${a.anim ? `<clipDictionary>${a.anim.dict}</clipDictionary>` : '<clipDictionary />'}
    <drawableDictionary />
    <physicsDictionary>${a.archetypeName}</physicsDictionary>
-   <assetType>${a.anim ? 'ASSET_TYPE_FRAGMENT' : 'ASSET_TYPE_DRAWABLE'}</assetType>
+   <assetType>${a.anim || a.destruct ? 'ASSET_TYPE_FRAGMENT' : 'ASSET_TYPE_DRAWABLE'}</assetType>
    <assetName>${a.modelName}</assetName>
    ${a.anim ? `<extensions>
     <Item type="CExtensionDefExpression">
@@ -659,6 +696,10 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 function fxmanifestLines() {
   if (!S.model || !S.door.created) return '';
   const a = archetype();
+  if (a.destruct) {
+    return `-- GTA Door Creator : ${a.archetypeName} (destructible, breaks by itself)\n-- stream/${a.modelName}.yft + ${a.ytypName}.ytyp\n` +
+      `data_file 'DLC_ITYP_REQUEST' 'stream/${a.ytypName}.ytyp'\n`;
+  }
   if (a.anim && a.anim.auto) {
     return `-- GTA Door Creator : ${a.archetypeName} (custom animation, loops by itself)\n-- stream/${a.modelName}.yft + ${a.anim.dict}.ycd + ${a.modelName}.yed + ${a.ytypName}.ytyp\n` +
       `data_file 'DLC_ITYP_REQUEST' 'stream/${a.ytypName}.ytyp'\n`;
@@ -690,7 +731,7 @@ function refreshYtyp() {
   const a = archetype(), d = S.door, y = d.ytyp;
   const setVal = (id, v) => { if (document.activeElement !== $(id)) $(id).value = v; };
   setVal('y-arch', a.archetypeName); setVal('y-model', a.modelName); setVal('y-file', a.ytypName + '.ytyp');
-  $('y-type').value = a.anim ? 'Animated fragment (.ycd)' : `Door · ${D.SPECIAL_ATTR_NAMES[a.specialAttribute]} (${a.specialAttribute})`;
+  $('y-type').value = a.destruct ? 'Destructible fragment' : a.anim ? 'Animated fragment (.ycd)' : `Door · ${D.SPECIAL_ATTR_NAMES[a.specialAttribute]} (${a.specialAttribute})`;
   const b = a.bounds;
   $('y-bounds').value = `${D.fmt(b.max[0] - b.min[0], 2)} × ${D.fmt(b.max[1] - b.min[1], 2)} × ${D.fmt(b.max[2] - b.min[2], 2)}`;
   $('y-center').value = `${D.fmt(b.center[0])}, ${D.fmt(b.center[1])}, ${D.fmt(b.center[2])}`;
@@ -715,9 +756,9 @@ function refreshYtyp() {
 ${K('Name:')}
    ${V(a.archetypeName)}
 ${K('Model:')}
-   ${V(a.modelName)}${a.anim ? '.yft' : '.ydr'}
+   ${V(a.modelName)}${a.anim || a.destruct ? '.yft' : '.ydr'}
 ${K('Type:')}
-   ${a.anim ? `${V('Animated fragment')} <span class="h">· ASSET_TYPE_FRAGMENT · expression ${esc(a.modelName)}</span>
+   ${a.destruct ? `${V('Destructible fragment')} <span class="h">· ${S.door.destruct.pieces} pieces · strength ${D.DESTRUCT_STRENGTH[S.door.destruct.strength]}${S.door.destruct.anchored === false ? '' : ' · anchored'}</span>` : a.anim ? `${V('Animated fragment')} <span class="h">· ASSET_TYPE_FRAGMENT · expression ${esc(a.modelName)}</span>
 ${K('Clips:')}
    ${V(a.anim.dict)}.ycd <span class="h">→ ${a.anim.auto ? esc(a.anim.clip) + ' (auto start, loops - no script)' : esc(a.anim.open) + ' / ' + esc(a.anim.close)}</span>` : `${V('Door')} <span class="h">· specialAttribute ${a.specialAttribute} (${D.SPECIAL_ATTR_NAMES[a.specialAttribute]})</span>`}
 ${K('Bounds:')}  <span class="h">min → max</span>
@@ -739,7 +780,7 @@ ${K('Texture Dict:')}
 ${K('Physics Dict:')}
    ${V(a.archetypeName)}
 ${K('Sound:')}
-   ${V(a.anim ? 'none (animated fragment)' : (resolveSound() || { label: 'none' }).label)}
+   ${V(a.anim || a.destruct ? 'none (fragment)' : (resolveSound() || { label: 'none' }).label)}
 <span class="h">----------------</span>
 <span class="t">MOTION</span> <span class="h">(pivot space, used by preview + Lua)</span>
    ${K('kind')} ${V(ms.kind)}  ${K('angle')} ${V(ms.angle.toFixed(1) + '°')}  ${K('offset')} ${V(ms.offset.map((x) => x.toFixed(2)).join(', '))}`;
@@ -755,6 +796,11 @@ function refreshExport() {
   const a = S.model && d.created ? archetype() : null;
   const n = a ? a.modelName : 'my_door';
   const col = d.collision.mode !== 'none';
+  if (d.type === 'destruct') {
+    $('fivem-tree').textContent = `${n}/ stream/{${n}.yft, ${a ? a.ytypName : n}.ytyp} · fxmanifest.lua · no script (breaks with explosions / impacts)`;
+    $('ex-ydr').textContent = 'EXPORT YFT'; $('ex-ybn').disabled = true;
+    return;
+  }
   if (D.isAnim(d)) {
     $('fivem-tree').textContent = `${n}/ stream/{${n}.yft, ${n}_anim.ycd, ${n}.yed, ${a ? a.ytypName : n}.ytyp} · fxmanifest.lua${d.type === 'custom' ? ' · no script (auto loop)' : ' · client/server.lua'}`;
     $('ex-ydr').textContent = 'EXPORT YFT+YCD'; $('ex-ybn').disabled = true;
@@ -783,6 +829,7 @@ function exportJob(outDir, outputs) {
       ytypName: a.ytypName, archetypeName: a.archetypeName, assetName: a.modelName, lodDist: a.lodDist, hdTextureDist: a.hdTextureDist,
       flags: a.flags, specialAttribute: a.specialAttribute, textureDictionary: a.textureDictionary, physicsDictionary: a.archetypeName,
     },
+    destruct: a.destruct ? { pieces: S.door.destruct.pieces, seed: S.door.destruct.seed, strength: D.DESTRUCT_STRENGTH[S.door.destruct.strength], anchored: S.door.destruct.anchored !== false } : undefined,
     anim: a.anim ? (() => {
       if (a.anim.auto) return { dict: a.anim.dict, samples: D.customSamples(S.door) };
       const ms = D.motionSpec(S.door, S.an, pivot());
@@ -798,7 +845,9 @@ async function doExport(outputs, label) {
     log(`› ${label}…`);
     const res = await api.exportFiles(exportJob(dir, outputs));
     for (const f of res.files) log(`  ✓ ${f}`, 'ok');
-    if (outputs.ydr && outputs.ytyp && D.isAnim(S.door)) {
+    if (outputs.ydr && outputs.ytyp && S.door.type === 'destruct') {
+      log('  ⧉ Put the .yft + .ytyp in stream/ + the data_file line (COPY FXMANIFEST): it breaks by itself, no script', 'w');
+    } else if (outputs.ydr && outputs.ytyp && D.isAnim(S.door)) {
       log(S.door.type === 'custom' ? '  ⧉ Put these 4 files in stream/ + the data_file line (COPY FXMANIFEST): the animation loops by itself, no script' : '  ⧉ Put these 4 files in stream/ and use EXPORT FIVEM RESOURCE for the Lua that plays the clips', 'w');
     } else if (outputs.ydr && outputs.ytyp) {
       const a = archetype();
@@ -828,9 +877,9 @@ async function exportFiveM() {
       [{ label: 'Cancel', value: false }, { label: 'Overwrite', value: true, accent: true }]);
     if (!r) return;
   }
-  const anim = D.isAnim(S.door);
+  const anim = D.isAnim(S.door), destruct = S.door.type === 'destruct';
   const withScript = (anim && S.door.type !== 'custom') || S.door.export.withScript === true;
-  if (!withScript && !anim && S.door.engine !== 'native') {
+  if (!withScript && !anim && !destruct && S.door.engine !== 'native') {
     S.door.engine = 'native'; refresh();
     toast('No-script resource: switched to NATIVE DOOR (the GTA door system moves it)', 'ok');
   }
@@ -849,11 +898,12 @@ async function exportFiveM() {
         log(`  ✓ collision/${b}  (not streamed - collision is embedded in the .ydr)`, 'ok');
       } else { streamFiles.push(b); log(`  ✓ stream/${b}`, 'ok'); }
     }
-    if (anim) log('  ✓ collision follows the animation (fragment + expression)', 'ok');
+    if (destruct) log(`  ✓ ${res.archetype?.pieces ?? ''} breakable pieces, one collision box each`, 'ok');
+    else if (anim) log('  ✓ collision follows the animation (fragment + expression)', 'ok');
     else if (S.door.collision.mode !== 'none') log('  ✓ collision embedded in ' + a.modelName + '.ydr', 'ok');
-    const audio = anim ? null : await writeAudio(joinPath(root, 'audio'), a);
+    const audio = anim || destruct ? null : await writeAudio(joinPath(root, 'audio'), a);
     if (audio) log(`  ✓ audio/${audio.file}  (sound: ${audio.label})`, 'ok');
-    const files = buildResource({ door: S.door, an: S.an, pivot: pivot(), resourceName: resName, ytypFile: a.ytypName + '.ytyp', streamFiles, withScript, anim: a.anim, modelName: a.modelName, audioFile: audio && audio.file, soundLabel: audio && audio.label });
+    const files = buildResource({ door: S.door, an: S.an, pivot: pivot(), resourceName: resName, ytypFile: a.ytypName + '.ytyp', streamFiles, withScript, anim: a.anim, destruct: destruct ? { pieces: res.archetype?.pieces ?? S.door.destruct.pieces, strength: D.DESTRUCT_STRENGTH[S.door.destruct.strength], anchored: S.door.destruct.anchored !== false } : null, modelName: a.modelName, audioFile: audio && audio.file, soundLabel: audio && audio.label });
     for (const [fname, text] of Object.entries(files)) { await api.writeText(joinPath(root, fname), text); log(`  ✓ ${fname}`, 'ok'); }
     for (const w of res.warnings || []) log(`  ! ${w}`, 'w');
     S.ytypGenerated = true; S.exported = true; refreshYtyp(); refreshSteps();
@@ -966,7 +1016,7 @@ async function openProject(path) {
     } else S.ybn = null;
     const res = await api.load(mp);
     const door = Object.assign(D.defaultDoor(), proj.door);
-    for (const k of ['normal', 'sliding', 'garage', 'pivot', 'collision', 'sound', 'ytyp', 'export', 'custom']) door[k] = Object.assign(D.defaultDoor()[k], proj.door[k] || {});
+    for (const k of ['normal', 'sliding', 'garage', 'pivot', 'collision', 'sound', 'ytyp', 'export', 'custom', 'destruct']) door[k] = Object.assign(D.defaultDoor()[k], proj.door[k] || {});
     if (S.ybn) door.collision.ybnPath = S.ybn.path;
     if (proj.door.export && proj.door.export.withScript === undefined) door.export.withScript = proj.door.engine !== 'native';
     S.ytypGenerated = !!proj.state?.ytypGenerated; S.exported = !!proj.state?.exported; S.configured = !!proj.state?.configured;
@@ -1099,6 +1149,13 @@ function bind() {
   // door settings
   $('btn-apply').onclick = applyDoorSettings;
 
+  // destructible
+  $('in-pieces').oninput = () => { S.door.destruct.pieces = +$('in-pieces').value; $('v-pieces').textContent = S.door.destruct.pieces; touch(); };
+  $('btn-recut').onclick = () => { S.door.destruct.seed = (S.door.destruct.seed | 0) + 1; touch(); };
+  $('btn-breakprev').onclick = () => { S.preview.t = 0; play(); };
+  $$('[data-ds]').forEach((b) => b.onclick = () => { S.door.destruct.strength = b.dataset.ds; touch(); });
+  $('in-anchored').onchange = () => { S.door.destruct.anchored = $('in-anchored').checked; touch(); };
+
   // custom animation
   $$('[data-ap]').forEach((b) => b.onclick = () => { S.door.custom = JSON.parse(JSON.stringify(D.ANIM_PRESETS[b.dataset.ap])); S.preview.t = 0; touch(); refreshCustom(true); play(); });
   $$('[data-ai]').forEach((b) => b.onclick = () => { S.door.custom.interp = b.dataset.ai; touch(); });
@@ -1205,7 +1262,7 @@ function fillDirOptionsOnly() { const keep = S.door.type; fillDoorSettingsDirOnl
 function fillDoorSettingsDirOnly(type) {
   const opts = type === 'normal' ? [['left', 'Left (hinge)'], ['right', 'Right (hinge)'], ['left-flip', 'Left · flipped'], ['right-flip', 'Right · flipped']]
     : type === 'sliding' ? [['left', '← Left'], ['right', 'Right →'], ['up', '↑ Up'], ['down', '↓ Down']]
-      : type === 'custom' ? [['loop', 'Loop (auto, no script)']]
+      : type === 'custom' ? [['loop', 'Loop (auto, no script)']] : type === 'destruct' ? [['pieces', 'Breaks in pieces']]
       : [['sliding', 'Garage sliding'], ['rollup', 'Garage roll up'], ['sectional', 'Garage sectional']];
   $('ds-dir').innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
 }
@@ -1213,7 +1270,7 @@ function fillDoorSettingsDirOnly(type) {
 function play() {
   if (!S.door.created) return;
   const p = S.preview;
-  if (S.door.type === 'custom') { if (p.t >= 0.999) p.t = 0; p.dir = 1; p.playing = true; p.played = true; refreshSteps(); applyPreview(); return; }
+  if (S.door.type === 'custom' || S.door.type === 'destruct') { if (p.t >= 0.999) p.t = 0; p.dir = 1; p.playing = true; p.played = true; refreshSteps(); applyPreview(); return; }
   if (!p.loop) p.dir = p.t >= 0.999 ? -1 : 1;
   else if (p.t >= 0.999) p.dir = -1; else if (p.t <= 0.001) p.dir = 1;
   p.playing = true; p.played = true; refreshSteps(); applyPreview();
