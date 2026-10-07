@@ -88,7 +88,7 @@
         <button class="home-card" data-home="tex">
           <svg viewBox="0 0 64 64"><rect x="8" y="12" width="34" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="3"/><path d="M12 40 L22 28 L30 36 L34 32 L40 40" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><circle cx="31" cy="21" r="3" fill="currentColor"/><rect x="22" y="22" width="34" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="3" opacity=".5"/></svg>
           <b>TEXTURES</b>
-          <span>Type a prop or shell name: every texture it uses is exported as .dds (from your folder or GTA V).</span>
+          <span>Export every texture of a prop / shell as .dds, or create your own textures (concrete, wood, metal, bricks…) with _n / _s and a .ytd.</span>
         </button>
       </div>
       <div class="home-foot">
@@ -157,7 +157,8 @@
           (embedded in the model, its .ytd, the parent .ytd it uses). An MLO shell exports the textures of every object inside.</span></div>
         <ol class="lod-steps"><li>Folders</li><li>Name</li><li>Check</li><li>Export .dds</li></ol>
       </div>
-      <div class="lod-grid">
+      <div class="seg tex-tabs"><button data-textab="export" class="on">⇩ EXPORT FROM A PROP / SHELL</button><button data-textab="create">✦ CREATE TEXTURES</button></div>
+      <div class="lod-grid" id="tex-export-tab">
         <div class="lod-col">
           <section class="panel">
             <div class="panel-h"><b>1 · WHERE TO SEARCH</b></div>
@@ -188,6 +189,47 @@
           <section class="panel">
             <div class="panel-h"><b>LOG</b></div>
             <div class="lod-log" id="tex-log"></div>
+          </section>
+        </div>
+      </div>
+      <div class="lod-grid tg-grid hidden" id="tex-create-tab">
+        <div class="lod-col">
+          <section class="panel">
+            <div class="panel-h"><b>1 · STYLE</b></div>
+            <div class="tg-presets" id="tg-presets"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-h"><b>2 · SETTINGS</b> <button class="btn tiny" id="tg-seed" style="margin-left:auto">↻ NEW VARIATION</button></div>
+            <div class="tg-colors"><label>Colour 1 <input type="color" id="tg-c1" /></label><label>Colour 2 <input type="color" id="tg-c2" /></label></div>
+            <label class="lbl">Scale <b id="tg-v-scale"></b> <span class="muted">(how many patterns / bricks / planks)</span></label><input type="range" id="tg-scale" min="1" max="32" step="1" />
+            <label class="lbl">Detail <b id="tg-v-detail"></b></label><input type="range" id="tg-detail" min="1" max="8" step="1" />
+            <label class="lbl">Contrast <b id="tg-v-contrast"></b></label><input type="range" id="tg-contrast" min="0" max="1" step="0.01" />
+            <div id="tg-extra-row"><label class="lbl">Joints <b id="tg-v-extra"></b> <span class="muted">(mortar / grout / gaps)</span></label><input type="range" id="tg-extra" min="0.01" max="0.2" step="0.01" /></div>
+            <label class="lbl">Relief <b id="tg-v-normal"></b> <span class="muted">(_n normal map)</span></label><input type="range" id="tg-normal" min="0" max="4" step="0.05" />
+            <label class="lbl">Shine <b id="tg-v-shine"></b> <span class="muted">(_s specular map)</span></label><input type="range" id="tg-shine" min="0" max="1" step="0.01" />
+          </section>
+          <section class="panel">
+            <div class="panel-h"><b>3 · NAME & SIZE</b></div>
+            <div class="tex-search"><input type="text" id="tg-name" spellcheck="false" /><select id="tg-size"><option>256</option><option selected>512</option><option>1024</option><option>2048</option></select></div>
+            <label class="check"><input type="checkbox" id="tg-maps" checked /> Also make <b>_n</b> (relief) and <b>_s</b> (shine)</label>
+            <div class="row2"><button class="btn" id="tg-dds">EXPORT .DDS</button><button class="btn accent" id="tg-add">＋ ADD TO THE .YTD</button></div>
+          </section>
+        </div>
+        <div class="lod-col wide">
+          <section class="panel">
+            <div class="panel-h"><b>PREVIEW</b> <span class="muted" id="tg-cap"></span>
+              <span class="lod-tools seg tight"><button data-tgv="col">COLOUR</button><button data-tgv="nrm">RELIEF _n</button><button data-tgv="spec">SHINE _s</button></span></div>
+            <canvas id="tg-canvas" width="512" height="512"></canvas>
+          </section>
+          <section class="panel">
+            <div class="panel-h"><b>4 · YOUR .YTD</b></div>
+            <div class="tg-list" id="tg-list"></div>
+            <div class="tex-search" style="margin-top:8px"><input type="text" id="tg-ytd" spellcheck="false" value="my_textures" /><button class="btn-create" id="tg-ytd-go">CREATE THE .YTD</button></div>
+            <div class="hint">Set this name as <b>Texture Dict</b> in your ytyp (or in Sollumz / CodeWalker) and stream the .ytd next to your model.</div>
+          </section>
+          <section class="panel">
+            <div class="panel-h"><b>LOG</b></div>
+            <div class="lod-log" id="tg-log"></div>
           </section>
         </div>
       </div>

@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('api', {
   texFind: inv('core:texFind'),
   texExport: inv('core:texExport'),
   texDeep: inv('core:texDeep'),
+  texBuild: inv('core:texBuild'),
   treeBuild: inv('core:treeBuild'),
   openYmapDialog: inv('dialog:openYmap'),
   detectGta: inv('app:detectGta'),

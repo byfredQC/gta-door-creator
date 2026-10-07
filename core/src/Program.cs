@@ -28,7 +28,7 @@ namespace DoorCore
             if (args.Length >= 2)
             {
                 var req = new JsonObject { ["id"] = 0, ["cmd"] = args[0] };
-                if (args[0] == "export" || args[0] == "build" || args[0] == "audio" || args[0] == "splitpreview" || args[0] == "destructanim" || args[0] == "dev" || args[0] == "treescan" || args[0] == "treebuild" || args[0] == "texfind" || args[0] == "texexport") req = JsonNode.Parse(File.ReadAllText(args[1])).AsObject();
+                if (args[0] == "export" || args[0] == "build" || args[0] == "audio" || args[0] == "splitpreview" || args[0] == "destructanim" || args[0] == "dev" || args[0] == "treescan" || args[0] == "treebuild" || args[0] == "texfind" || args[0] == "texexport" || args[0] == "texbuild") req = JsonNode.Parse(File.ReadAllText(args[1])).AsObject();
                 else req["path"] = args[1];
                 if (!req.ContainsKey("cmd")) req["cmd"] = args[0];
                 Console.WriteLine(Handle(req).ToJsonString());
@@ -66,6 +66,7 @@ namespace DoorCore
                     "texfind" => TexExport.Find(req),
                     "texexport" => TexExport.Export(req),
                     "texdeep" => TexExport.Deep(req),
+                    "texbuild" => TexBuild.Build(req),
                     "export" => Exporter.Export(req),
                     "build" => TestBuilder.Build(req),
                     "audio" => Audio.Build(req),

@@ -7,6 +7,7 @@ import { BUILTIN_PRESETS } from './presets.js';
 import { DOOR_SOUNDS, VANILLA_DOOR_SOUND } from './doorsounds.js';
 import { initTreeLod } from './treelod.js';
 import { initTextures } from './textures.js';
+import { initTexGen } from './texgen.js';
 import { setLang, getLang, tr, defaultLang } from './i18n.js';
 
 const api = window.api ? { ...window.api, chooseFolder: (t) => window.api.chooseFolder(tr(t)) } : null;
@@ -72,6 +73,12 @@ const texPage = initTextures({
   chooseOutFolder: async () => S.settings?.outFolder || S.door.export.folder || await api.chooseFolder('Where should the textures be exported?'),
 });
 window.__texPage = texPage;
+const texGen = initTexGen({ api, toast: (m, k) => toast(m, k), chooseOutFolder: async () => S.settings?.outFolder || S.door.export.folder || await api.chooseFolder('Where should the textures be created?') });
+document.querySelectorAll('[data-textab]').forEach((b) => b.onclick = () => {
+  document.querySelectorAll('[data-textab]').forEach((x) => x.classList.toggle('on', x === b));
+  $('tex-export-tab').classList.toggle('hidden', b.dataset.textab !== 'export'); $('tex-create-tab').classList.toggle('hidden', b.dataset.textab !== 'create');
+  if (b.dataset.textab === 'create') texGen.show();
+});
 
 viewer.onFrame = (dt) => {
   const p = S.preview;

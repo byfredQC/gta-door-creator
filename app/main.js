@@ -89,6 +89,7 @@ ipcMain.handle('core:buildSample', (_e, out, kind) => core.request('build', { ou
 ipcMain.handle('core:audio', (_e, out, links) => core.request('audio', { out, links }));
 ipcMain.handle('core:splitPreview', (_e, source, pieces, seed) => core.request('splitpreview', { source, pieces, seed }));
 ipcMain.handle('core:texFind', (_e, payload) => core.request('texfind', payload));
+ipcMain.handle('core:texBuild', (_e, payload) => core.request('texbuild', payload));
 ipcMain.handle('core:texDeep', (_e, payload) => core.request('texdeep', payload));
 ipcMain.handle('core:texExport', (_e, payload) => core.request('texexport', payload));
 ipcMain.handle('core:treeScan', (_e, payload) => core.request('treescan', payload));
