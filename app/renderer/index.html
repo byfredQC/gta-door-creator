@@ -84,6 +84,11 @@
           <b>TREE LOD</b>
           <span>Your ymap of GTA trees seen from far away: LOD models + a _lod.ymap linked to your ymap, like GTA forests.</span>
         </button>
+        <button class="home-card" data-home="tex">
+          <svg viewBox="0 0 64 64"><rect x="8" y="12" width="34" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="3"/><path d="M12 40 L22 28 L30 36 L34 32 L40 40" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><circle cx="31" cy="21" r="3" fill="currentColor"/><rect x="22" y="22" width="34" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="3" opacity=".5"/></svg>
+          <b>TEXTURES</b>
+          <span>Type a prop or shell name: every texture it uses is exported as .dds (from your folder or GTA V).</span>
+        </button>
       </div>
       <div class="home-foot">
         <button class="btn" id="home-open">Open project…</button>
@@ -137,6 +142,51 @@
           <section class="panel">
             <div class="panel-h"><b>LOG</b></div>
             <div class="lod-log" id="lod-log"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================ TEXTURES page -->
+  <section id="tex-page" class="lod-page tex-page hidden">
+    <div class="lod-inner">
+      <div class="lod-head">
+        <div><b>TEXTURES</b><span>Type the name of a prop or a shell: the app finds it in your folder or in GTA V and exports <b>every texture it uses</b> as <code>.dds</code>
+          (embedded in the model, its .ytd, the parent .ytd it uses). An MLO shell exports the textures of every object inside.</span></div>
+        <ol class="lod-steps"><li>Folders</li><li>Name</li><li>Check</li><li>Export .dds</li></ol>
+      </div>
+      <div class="lod-grid">
+        <div class="lod-col">
+          <section class="panel">
+            <div class="panel-h"><b>1 · WHERE TO SEARCH</b></div>
+            <label class="lbl">GTA V folder <span class="muted">(read only)</span></label>
+            <div class="lod-path" id="tex-gta">–</div>
+            <div class="row2"><button class="btn" id="tex-gta-detect">Find it</button><button class="btn" id="tex-gta-choose">Choose…</button></div>
+            <label class="lbl">Your folder <span class="muted">(server resources, shells… searched first)</span></label>
+            <div class="lod-path" id="tex-folder">–</div>
+            <div class="row2"><button class="btn" id="tex-folder-choose">Choose…</button><button class="btn" id="tex-folder-clear">Clear</button></div>
+          </section>
+          <section class="panel">
+            <div class="panel-h"><b>2 · NAME</b></div>
+            <div class="tex-search"><input type="text" id="tex-name" spellcheck="false" placeholder="shell_lester / prop_tree_pine_01 / v_ilev_bl_door_r" /><button class="btn accent" id="tex-go">SEARCH</button></div>
+            <div class="hint" id="tex-info">Model, archetype (ytyp) or .ytd name. Without extension.</div>
+          </section>
+          <section class="panel">
+            <div class="panel-h"><b>4 · EXPORT</b></div>
+            <button class="btn-create lod-go" id="tex-export" disabled>EXPORT .DDS</button>
+            <div class="hint" id="tex-out"></div>
+          </section>
+        </div>
+        <div class="lod-col wide">
+          <section class="panel">
+            <div class="panel-h"><b>3 · TEXTURES</b> <span class="muted" id="tex-sum"></span>
+              <span class="lod-tools"><button class="btn tiny" id="tex-all">All</button><button class="btn tiny" id="tex-none">None</button></span></div>
+            <div class="tex-grid" id="tex-grid"><div class="muted">Type a name and SEARCH.</div></div>
+          </section>
+          <section class="panel">
+            <div class="panel-h"><b>LOG</b></div>
+            <div class="lod-log" id="tex-log"></div>
           </section>
         </div>
       </div>

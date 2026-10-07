@@ -64,6 +64,14 @@ namespace DoorCore
                 RpfFile.CreateFile(veg, "prop_tree_birch_02.ydr", Ydr("prop_tree_birch_02", 1));
                 RpfFile.CreateFile(veg, "v_trees.ytyp", Meta(Ytyp("v_trees", ("prop_tree_pine_01", "v_trees_txd"), ("prop_tree_birch_02", "v_trees_txd"))));
                 RpfFile.CreateFile(str, "prop_bench_01a.ydr", Ydr("prop_bench_01a", 1));
+                if (req["dds"] is JsonArray dl)
+                {
+                    var texs = new System.Collections.Generic.List<Texture>();
+                    foreach (var d in dl) { var t = CodeWalker.Utils.DDSIO.GetTexture(File.ReadAllBytes((string)d)); t.Name = Path.GetFileNameWithoutExtension((string)d); t.NameHash = JenkHash.GenHash(t.Name.ToLowerInvariant()); texs.Add(t); }
+                    var y = new YtdFile { TextureDict = new TextureDictionary() }; y.TextureDict.BuildFromTextureList(texs);
+                    var tx = RpfFile.CreateDirectory(g5, "maps");
+                    RpfFile.CreateFile(tx, "v_concrete_txd.ytd", y.Save());
+                }
                 RpfFile.CreateFile(str, "v_street.ytyp", Meta(Ytyp("v_street", ("prop_bench_01a", "prop_bench_txd"))));
                 foreach (var f in new[] { "x64a.rpf", "x64i.rpf" })   // CodeWalker joins with '\\' - on Linux the file lands next to the folder
                 {

@@ -6,6 +6,7 @@ import { buildResource } from './fivem.js';
 import { BUILTIN_PRESETS } from './presets.js';
 import { DOOR_SOUNDS, VANILLA_DOOR_SOUND } from './doorsounds.js';
 import { initTreeLod } from './treelod.js';
+import { initTextures } from './textures.js';
 
 const api = window.api;
 const $ = (id) => document.getElementById(id);
@@ -65,6 +66,11 @@ const treeLod = initTreeLod({
   chooseOutFolder: async () => S.settings?.outFolder || S.door.export.folder || await api.chooseFolder('Where should the tree LOD resource be created?'),
 });
 window.__treeLod = treeLod;
+const texPage = initTextures({
+  api, toast: (m, k) => toast(m, k), getSettings: () => S.settings || (S.settings = {}), saveSettings: () => api.saveSettings(S.settings),
+  chooseOutFolder: async () => S.settings?.outFolder || S.door.export.folder || await api.chooseFolder('Where should the textures be exported?'),
+});
+window.__texPage = texPage;
 
 viewer.onFrame = (dt) => {
   const p = S.preview;
@@ -619,8 +625,8 @@ document.addEventListener('click', (e) => {
 });
 
 // ------------------------------------------------------------------ HOME
-function showHome(on = true) { $('home').classList.toggle('hidden', !on); if (on) { $('so-modal').classList.add('hidden'); treeLod.show(false); } }
-const MODE_TITLES = { door: 'CREATE DOOR', sound: 'DOOR SOUND', anim: 'ANIMATION', destruct: 'DESTRUCT', lod: 'TREE LOD' };
+function showHome(on = true) { $('home').classList.toggle('hidden', !on); if (on) { $('so-modal').classList.add('hidden'); treeLod.show(false); texPage.show(false); } }
+const MODE_TITLES = { door: 'CREATE DOOR', sound: 'DOOR SOUND', anim: 'ANIMATION', destruct: 'DESTRUCT', lod: 'TREE LOD', tex: 'TEXTURES' };
 const MODE_PAGES = {
   door: { sub: 'Hinged, sliding or garage door for your MLO / ymap.', steps: ['Import prop', 'Create door', 'Type & side', 'Preview', 'Export'] },
   anim: { sub: 'Make any prop move - it loops by itself in-game, no script.', steps: ['Import prop', 'Preset or keyframes', 'Pivot', '▶ Preview', 'Export'] },
@@ -636,6 +642,7 @@ function setMode(mode) {
   $('so-modal').classList.toggle('as-page', mode === 'sound');
   $('so-close').textContent = mode === 'sound' ? '← Home' : 'Close';
   treeLod.show(mode === 'lod');
+  texPage.show(mode === 'tex');
   // a model already loaded follows the page: door types on the door page, custom / destruct on theirs
   if (S.model && S.door.created) {
     if (mode === 'door' && (S.door.type === 'custom' || S.door.type === 'destruct')) { setType('normal'); touch(); }
@@ -648,7 +655,7 @@ async function homePick(mode) {
   showHome(false);
   setMode(mode === 'custom' ? 'anim' : mode);
   if (mode === 'sound') { openSoundOnly(); return; }
-  if (mode === 'lod') return;
+  if (mode === 'lod' || mode === 'tex') return;
   S.pendingType = mode === 'door' ? null : mode;   // 'custom' | 'destruct' : chosen right after the prop is imported
   if (S.model) { applyPendingType(); return; }
   const paths = await api.openPropDialog();
@@ -1194,7 +1201,7 @@ function bind() {
   $('btn-settings').onclick = openSettings;
   $$('[data-home]').forEach((b) => b.onclick = () => homePick(b.dataset.home));
   $('home-open').onclick = () => { showHome(false); setMode(null); openProject(); };
-  $('home-continue').onclick = () => { showHome(false); if (!S.mode || S.mode === 'sound' || S.mode === 'lod') setMode('door'); };
+  $('home-continue').onclick = () => { showHome(false); if (!S.mode || S.mode === 'sound' || S.mode === 'lod' || S.mode === 'tex') setMode('door'); };
 
   // import
   const importDialog = async () => loadPaths(await api.openPropDialog());
@@ -1209,7 +1216,7 @@ function bind() {
     const proj = paths.find((p) => p.toLowerCase().endsWith('.doorproject'));
     const ymap = paths.find((p) => /\.ymap(\.xml)?$/i.test(p));
     if (ymap) { if (S.mode !== 'lod') homePick('lod'); treeLod.openYmap(ymap); return; }
-    if (S.mode === 'lod') return;
+    if (S.mode === 'lod' || S.mode === 'tex') return;
     if (proj) openProject(proj); else loadPaths(paths);
   });
 

@@ -347,7 +347,7 @@ body.dragging .drop-overlay { display: flex; }
 .home-head p { margin: 0; color: var(--text2); font-size: 14px; }
 .home-mark { display: inline-block; width: 54px; height: 54px; border-radius: 12px; background: linear-gradient(135deg, var(--accent) 0%, #5b21b6 100%); box-shadow: 0 10px 40px #a855f755; position: relative; }
 .home-mark::after { content: ""; position: absolute; left: 17px; top: 12px; width: 20px; height: 30px; border: 3px solid #fff; border-radius: 2px; transform: perspective(60px) rotateY(-30deg); transform-origin: left; }
-.home-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+.home-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .home-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 28px 18px 24px; cursor: pointer;
   background: linear-gradient(180deg, var(--bg3) 0%, var(--bg2) 100%); border: 1.5px solid var(--line2); border-radius: 14px; color: var(--text);
   transition: transform .15s, border-color .15s, box-shadow .15s; }
@@ -419,7 +419,7 @@ body[data-mode="lod"] { --accent: #22c55e; --accent2: #86efac; --accent-deep: #1
 .lod-page.hidden { display: none; }
 .lod-inner { width: min(1400px, 96vw); margin: 0 auto; padding: 18px 0 30px; }
 .lod-head { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 14px 18px; border: 1px solid #22c55e55; border-radius: 10px; background: linear-gradient(135deg, #0f2e1c, #0b0a0f); margin-bottom: 14px; }
-.lod-head b { display: block; font: 800 20px var(--font-head); letter-spacing: .14em; color: var(--accent2); margin-bottom: 4px; }
+.lod-head > div > b { display: block; font: 800 20px var(--font-head); letter-spacing: .14em; color: var(--accent2); margin-bottom: 4px; }
 .lod-head span { color: var(--text2); font-size: 12.5px; line-height: 1.5; }
 .lod-steps { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; counter-reset: s; flex-shrink: 0; }
 .lod-steps li { counter-increment: s; font: 600 10.5px var(--font-head); letter-spacing: .06em; color: var(--text2); border: 1px solid var(--line2); border-radius: 12px; padding: 3px 9px; white-space: nowrap; }
@@ -455,3 +455,21 @@ body[data-mode="lod"] .btn-create { background: linear-gradient(135deg, var(--ac
 body[data-mode="lod"] #steps { display: none !important; }
 .dropzone.small b { display: block; margin-bottom: 2px; }
 .dropzone.small span { display: block; }
+
+/* ---------------------------------------------------------------- TEXTURES page */
+body[data-mode="tex"] { --accent: #eab308; --accent2: #fde047; --accent-deep: #a16207; }
+body[data-mode="tex"] #steps { display: none !important; }
+body[data-mode="tex"] .btn-create { background: linear-gradient(135deg, var(--accent-deep), #0b0a0f); box-shadow: 0 6px 20px #eab30833; }
+.tex-page .lod-head { border-color: #eab30855; background: linear-gradient(135deg, #2e2508, #0b0a0f); }
+.tex-page { background: radial-gradient(1000px 500px at 50% -10%, #2e2508 0%, transparent 60%), var(--bg0); }
+.tex-search { display: flex; gap: 6px; }
+.tex-search input { flex: 1; min-width: 0; }
+.tex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; max-height: 560px; overflow: auto; }
+.tex-card { border: 1px solid var(--line2); border-radius: 6px; padding: 6px; background: var(--bg0); cursor: pointer; position: relative; }
+.tex-card.off { opacity: .4; }
+.tex-card canvas { width: 100%; aspect-ratio: 1; object-fit: contain; display: block; border-radius: 4px; image-rendering: auto;
+  background: repeating-conic-gradient(#222 0 25%, #2c2c2c 0 50%) 50% / 16px 16px; }
+.tex-card b { display: block; font-size: 11px; margin-top: 5px; word-break: break-all; color: var(--text); }
+.tex-card span { display: block; font-size: 10.5px; color: var(--text2); }
+.tex-card input { position: absolute; top: 9px; left: 9px; }
+.tex-missing { grid-column: 1 / -1; font-size: 11.5px; color: #fbbf24; }

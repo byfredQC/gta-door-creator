@@ -28,7 +28,7 @@ Nothing else to install: the release build includes everything (no .NET, no Blen
 
 ## Features
 
-The app opens on a **home page** with 5 big choices: **CREATE DOOR**, **DOOR SOUND**, **ANIMATION**, **DESTRUCT**, **TREE LOD** (⌂ HOME in the top bar brings it back).
+The app opens on a **home page** with 6 big choices: **CREATE DOOR**, **DOOR SOUND**, **ANIMATION**, **DESTRUCT**, **TREE LOD**, **TEXTURES** (⌂ HOME in the top bar brings it back).
 
 
 | | |
@@ -44,6 +44,7 @@ The app opens on a **home page** with 5 big choices: **CREATE DOOR**, **DOOR SOU
 | **Animated .ycd** | Third mode **ANIMATED .YCD**: exports the door as a GTA animated fragment — `.yft` (root + door bone) + `.ycd` (open / close clips baked from the preview) + `.yed` (expression) + fragment `.ytyp`. The **collision follows the animation**. A small Lua plays the clips with E, synced for all players. |
 | **Destructible** | Door type **DESTRUCT**: the prop (a bridge, a wall, a sign…) is cut into 2–40 pieces (slider, *new cut*, break preview). Exported as a GTA breakable fragment: explosions, vehicles and bullets break the pieces off and they fall with real physics — **no script**. Strength: fragile / normal / solid / very solid, anchored or not. Or **.YCD ANIMATION**: an explosion clip baked by the app (force light → huge, intact / on the ground / rebuild times) that GTA plays and loops by itself — intact, explodes, pieces bounce and lie on the ground, then fly back together. Exports `.yft + _anim.ycd + .yed + .ytyp`, the collision of every piece follows the animation, no script. |
 | **Tree LOD** | Home page **TREE LOD**: drop a ymap of GTA trees (`prop_tree_*`), the app reads your own GTA V Legacy install (read only) and makes a light LOD model per tree type (its lowest GTA detail level, GTA's own textures), a `<ymap>_lod.ymap` with one LOD per tree, a LOD `.ytyp`, and links your ymap to it (flag 8 + parentIndex, like vanilla). Trees stay visible up to 500–3000 m. Also removes the broken `LOD in Parented YMAP` flag from entities without a LOD. |
+| **Textures** | Home page **TEXTURES**: type a prop / shell name, the app finds it in your own folder (server resources) then in your GTA V install (read only) and exports every texture it uses as `.dds`: embedded in the model, its `.ytd`, the parent `.ytd` (gtxd) and `mapdetail`. An MLO shell exports the textures of every object inside. Textures used but stored in another GTA `.ytd` can be found with *Search them in all GTA .ytd* (index cached after the first time). |
 | **Custom animation** | Door type **CUSTOM ANIM**: animate any prop with keyframes (rotation X/Y/Z in degrees, 360 = one turn, + movement in metres), presets *spin 360°*, *swing*, *bob*. Exported as an animated fragment that **starts and loops by itself in-game — no script** (logos, signs, fans…). |
 | **YTYP** | Live archetype preview (summary / XML), flags, LOD, HD LOD, texture dictionary. |
 | **Export** | `EXPORT YDR / YTYP / YBN / ALL` and **EXPORT FIVEM RESOURCE**. |
