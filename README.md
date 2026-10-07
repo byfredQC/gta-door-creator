@@ -28,6 +28,8 @@ Nothing else to install: the release build includes everything (no .NET, no Blen
 
 ## Features
 
+The app is in **English or French** (⚙ Settings › Language, or the EN/FR button in the top bar; French by default on a French Windows).
+
 The app opens on a **home page** with 6 big choices: **CREATE DOOR**, **DOOR SOUND**, **ANIMATION**, **DESTRUCT**, **TREE LOD**, **TEXTURES** (⌂ HOME in the top bar brings it back).
 
 

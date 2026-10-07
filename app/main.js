@@ -51,6 +51,12 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+// language of the native dialogs (the page itself is translated in the renderer)
+let LANG = 'en';
+try { LANG = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'settings.json'), 'utf8')).lang || (/^fr/i.test(app.getLocale?.() || '') ? 'fr' : 'en'); } catch { }
+const L = (en, fr) => (LANG === 'fr' ? fr : en);
+ipcMain.handle('app:setLang', (_e, l) => { LANG = l === 'fr' ? 'fr' : 'en'; return LANG; });
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1600, height: 960, minWidth: 1180, minHeight: 720,
@@ -66,8 +72,8 @@ function createWindow() {
   win.on('close', (e) => {
     if (!dirty || process.env.GDC_NO_PROMPT) return;
     const r = dialog.showMessageBoxSync(win, {
-      type: 'question', buttons: ['Quit without saving', 'Cancel'], defaultId: 1, cancelId: 1,
-      title: 'Unsaved project', message: 'This door project has unsaved changes. Quit anyway?',
+      type: 'question', buttons: [L('Quit without saving', 'Quitter sans enregistrer'), L('Cancel', 'Annuler')], defaultId: 1, cancelId: 1,
+      title: L('Unsaved project', 'Projet non enregistré'), message: L('This door project has unsaved changes. Quit anyway?', 'Ce projet a des modifications non enregistrées. Quitter quand même ?'),
     });
     if (r !== 0) e.preventDefault();
   });
@@ -88,7 +94,7 @@ ipcMain.handle('core:texExport', (_e, payload) => core.request('texexport', payl
 ipcMain.handle('core:treeScan', (_e, payload) => core.request('treescan', payload));
 ipcMain.handle('core:treeBuild', (_e, payload) => core.request('treebuild', payload));
 ipcMain.handle('dialog:openYmap', async () => {
-  const r = await dialog.showOpenDialog(win, { title: 'Choose the ymap with your trees', properties: ['openFile'], filters: [{ name: 'YMAP', extensions: ['ymap', 'xml'] }] });
+  const r = await dialog.showOpenDialog(win, { title: L('Choose the ymap with your trees', "Choisis le ymap avec tes arbres"), properties: ['openFile'], filters: [{ name: 'YMAP', extensions: ['ymap', 'xml'] }] });
   return r.canceled ? null : r.filePaths[0];
 });
 // GTA V Legacy folder: usual install places (Rockstar launcher, Steam, Epic) on every drive
@@ -105,27 +111,27 @@ ipcMain.handle('app:isGta', (_e, d) => { try { return fs.existsSync(path.join(d,
 ipcMain.handle('core:destructAnim', (_e, pieces, anim, seed) => core.request('destructanim', { pieces, anim, seed }));
 
 ipcMain.handle('dialog:openProp', async () => {
-  const r = await dialog.showOpenDialog(win, { title: 'Import GTA prop', properties: ['openFile', 'multiSelections'], filters: PROP_FILTERS });
+  const r = await dialog.showOpenDialog(win, { title: L('Import GTA prop', "Importer un prop GTA"), properties: ['openFile', 'multiSelections'], filters: PROP_FILTERS });
   return r.canceled ? [] : r.filePaths;
 });
 ipcMain.handle('dialog:openYtyp', async () => {
-  const r = await dialog.showOpenDialog(win, { title: 'Choose your .ytyp (the archetype will be added to it)', properties: ['openFile'], filters: [{ name: 'YTYP', extensions: ['ytyp'] }] });
+  const r = await dialog.showOpenDialog(win, { title: L('Choose your .ytyp (the archetype will be added to it)', "Choisis ton .ytyp (l'archétype y sera ajouté)"), properties: ['openFile'], filters: [{ name: 'YTYP', extensions: ['ytyp'] }] });
   return r.canceled ? null : r.filePaths[0];
 });
 ipcMain.handle('dialog:openYbn', async () => {
-  const r = await dialog.showOpenDialog(win, { title: 'Import collision (YBN)', properties: ['openFile'], filters: [{ name: 'Collision', extensions: ['ybn'] }] });
+  const r = await dialog.showOpenDialog(win, { title: L('Import collision (YBN)', "Importer une collision (YBN)"), properties: ['openFile'], filters: [{ name: 'Collision', extensions: ['ybn'] }] });
   return r.canceled ? null : r.filePaths[0];
 });
 ipcMain.handle('dialog:chooseFolder', async (_e, title) => {
-  const r = await dialog.showOpenDialog(win, { title: title || 'Choose folder', properties: ['openDirectory', 'createDirectory'] });
+  const r = await dialog.showOpenDialog(win, { title: title || L('Choose folder', 'Choisir un dossier'), properties: ['openDirectory', 'createDirectory'] });
   return r.canceled ? null : r.filePaths[0];
 });
 ipcMain.handle('dialog:saveProject', async (_e, defName) => {
-  const r = await dialog.showSaveDialog(win, { title: 'Save door project', defaultPath: defName || 'door.doorproject', filters: [{ name: 'Door project', extensions: ['doorproject'] }] });
+  const r = await dialog.showSaveDialog(win, { title: L('Save door project', "Enregistrer le projet"), defaultPath: defName || 'door.doorproject', filters: [{ name: 'Door project', extensions: ['doorproject'] }] });
   return r.canceled ? null : r.filePath;
 });
 ipcMain.handle('dialog:openProject', async () => {
-  const r = await dialog.showOpenDialog(win, { title: 'Open door project', properties: ['openFile'], filters: [{ name: 'Door project', extensions: ['doorproject'] }] });
+  const r = await dialog.showOpenDialog(win, { title: L('Open door project', "Ouvrir un projet"), properties: ['openFile'], filters: [{ name: 'Door project', extensions: ['doorproject'] }] });
   return r.canceled ? null : r.filePaths[0];
 });
 ipcMain.handle('dialog:message', async (_e, opts) => (await dialog.showMessageBox(win, opts)).response);

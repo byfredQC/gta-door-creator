@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('api', {
   treeBuild: inv('core:treeBuild'),
   openYmapDialog: inv('dialog:openYmap'),
   detectGta: inv('app:detectGta'),
+  setLang: inv('app:setLang'),
   isGta: inv('app:isGta'),
   openPropDialog: inv('dialog:openProp'),
   openYbnDialog: inv('dialog:openYbn'),

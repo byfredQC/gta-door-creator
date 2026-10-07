@@ -7,8 +7,9 @@ import { BUILTIN_PRESETS } from './presets.js';
 import { DOOR_SOUNDS, VANILLA_DOOR_SOUND } from './doorsounds.js';
 import { initTreeLod } from './treelod.js';
 import { initTextures } from './textures.js';
+import { setLang, getLang, tr, defaultLang } from './i18n.js';
 
-const api = window.api;
+const api = window.api ? { ...window.api, chooseFolder: (t) => window.api.chooseFolder(tr(t)) } : null;
 const $ = (id) => document.getElementById(id);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
@@ -596,6 +597,7 @@ async function openSettings() {
     : ui.portable ? `Single .exe version - nothing is installed: just delete <b>${esc(ui.portable)}</b>.`
       : 'Portable / zip version - nothing is installed: just delete the folder.';
   const r = await modal('SETTINGS', `
+    <div class="set-row"><span>Language</span><span class="seg tight lang-seg"><button data-lang="en" class="${getLang() === 'en' ? 'on' : ''}">ENGLISH</button><button data-lang="fr" class="${getLang() === 'fr' ? 'on' : ''}">FRANÇAIS</button></span></div>
     <div class="set-row"><span>Version</span><b>v${esc(inf.version || '?')}</b></div>
     <div class="set-row"><span>Program folder</span><button class="btn" id="set-open-app">Open</button></div>
     <div class="set-row"><span>Settings &amp; presets</span><button class="btn" id="set-open-data">Open</button></div>
@@ -617,7 +619,17 @@ async function openSettings() {
   const done = await api.uninstall(!!wipe);
   if (!done) toast('Uninstaller not found - delete the program folder by hand', 'err');
 }
+function applyLang(l, save = true) {
+  setLang(l);
+  document.querySelectorAll('[data-lang]').forEach((b) => b.classList.toggle('on', b.dataset.lang === getLang()));
+  const bl = document.getElementById('btn-lang'); if (bl) bl.textContent = getLang() === 'fr' ? 'FR' : 'EN';
+  api.setLang && api.setLang(getLang());
+  if (save) { S.settings = S.settings || {}; S.settings.lang = getLang(); api.saveSettings(S.settings); }
+}
 document.addEventListener('click', (e) => {
+  const lb = e.target?.closest?.('[data-lang]');
+  if (lb) { applyLang(lb.dataset.lang); return; }
+  if (e.target?.id === 'btn-lang') { applyLang(getLang() === 'fr' ? 'en' : 'fr'); return; }
   const id = e.target?.id;
   if (id === 'set-open-app') api.openAppFolder('app');
   else if (id === 'set-open-data') api.openAppFolder('data');
@@ -1484,6 +1496,7 @@ async function boot() {
   seg('view-seg', 'view', 'persp'); seg('shade-seg', 'shade', 'material'); seg('yp-mode', 'yp', 'text');
   try { const inf = await api.info(); $('home-version').textContent = 'v' + (inf.version || ''); } catch { }
   S.settings = await api.loadSettings();
+  applyLang(S.settings.lang || defaultLang(), false);
   S.door.export.folder = S.settings.outFolder || null;
   S.userPresets = await api.loadPresets();
   renderPresets();

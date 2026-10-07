@@ -22,8 +22,13 @@ class Core {
       path.join(__dirname, '..', 'core', 'bin', 'Release', 'net8.0'),
     ];
     // hot-fix engine dropped next to the installed one (framework-dependent build, needs the .NET 8 runtime)
-    const upd = path.join(process.resourcesPath || '', 'core', 'update');
-    if (fs.existsSync(path.join(upd, 'DoorCore.dll'))) return { cmd: 'dotnet', args: [path.join(upd, 'DoorCore.dll')], dir: upd };
+    // newest of resources/core/update, update-1.19.0, update-1.20.0 ... (a new folder per version: the running engine locks its own dll)
+    const base = path.join(process.resourcesPath || '', 'core');
+    const ver = (n) => (n.match(/^update-(\d+)\.(\d+)\.(\d+)$/) || [0, 0, 0, 0]).slice(1).map(Number);
+    let dirs = [];
+    try { dirs = fs.readdirSync(base).filter((n) => /^update(-[\d.]+)?$/.test(n) && fs.existsSync(path.join(base, n, 'DoorCore.dll'))); } catch { }
+    dirs.sort((a, b) => { const x = ver(a), y = ver(b); return (y[0] - x[0]) || (y[1] - x[1]) || (y[2] - x[2]); });
+    if (dirs.length) { const upd = path.join(base, dirs[0]); return { cmd: 'dotnet', args: [path.join(upd, 'DoorCore.dll')], dir: upd }; }
     for (const dir of candidates) {
       const exe = path.join(dir, process.platform === 'win32' ? 'DoorCore.exe' : 'DoorCore');
       const dll = path.join(dir, 'DoorCore.dll');
