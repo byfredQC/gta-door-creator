@@ -5,7 +5,7 @@
 bl_info = {
     "name": "GTA Door Creator (Sollumz)",
     "author": "byfred",
-    "version": (1, 1, 0),
+    "version": (1, 1, 1),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar (N) > Door Creator",
     "description": "Make GTA V / FiveM doors: pivot, collision, ytyp, sound and FiveM resource - with Sollumz",
@@ -278,12 +278,22 @@ def _preview_update(self, context):
     d.matrix_world = m
 
 
+# Blender only keeps a pointer to the strings of dynamic enum items: they must stay alive in Python,
+# otherwise the menu shows garbage text. Every list returned below is kept in _ENUM_CACHE.
+_ENUM_CACHE = {}
+
+
+def _keep(key, items):
+    _ENUM_CACHE[key] = items
+    return items
+
+
 def _sound_items(self, context):
     t = SOUND_TYPE["sliding_v" if (self.door_type == "SLIDING" and self.slide_dir == "UP") or (self.door_type == "GARAGE" and self.garage_kind == "ROLLUP") else self.door_type.lower()]
     items = [("AUTO", "Auto (son par défaut de ce type)", ""), ("NONE", "Aucun son", "")]
     items += [(sid, label, "") for sid, st, label in DOOR_SOUNDS if st == t]
     items += [(sid, "(autre type) " + label, "") for sid, st, label in DOOR_SOUNDS if st != t]
-    return items
+    return _keep(("sound", t), items)
 
 
 def _ytyp_items(self, context):
@@ -291,12 +301,14 @@ def _ytyp_items(self, context):
     for y in getattr(context.scene, "ytyps", []):
         if y.name:
             items.append(("Y:" + y.name, y.name, "Ajoute la porte dans ce ytyp (ex. celui de ton MLO, importé avec Sollumz)"))
-    return items
+    return _keep("ytyp", items)
 
 
 def _all_sound_items(self, context):
     names = {4: "Charnière", 0: "Coulissante", 1: "Verticale", 2: "Garage", 3: "Barrière"}
-    return [(sid, f"{names.get(st, '?')} · {label}", "") for sid, st, label in DOOR_SOUNDS]
+    if "all_sounds" not in _ENUM_CACHE:
+        _ENUM_CACHE["all_sounds"] = [(sid, f"{names.get(st, '?')} · {label}", "") for sid, st, label in DOOR_SOUNDS]
+    return _ENUM_CACHE["all_sounds"]
 
 
 class GDC_Props(bpy.types.PropertyGroup):
