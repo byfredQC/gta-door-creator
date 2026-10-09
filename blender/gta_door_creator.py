@@ -5,7 +5,7 @@
 bl_info = {
     "name": "GTA Door Creator (Sollumz)",
     "author": "byfred",
-    "version": (1, 1, 1),
+    "version": (1, 2, 0),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar (N) > Door Creator",
     "description": "Make GTA V / FiveM doors: pivot, collision, ytyp, sound and FiveM resource - with Sollumz",
@@ -26,10 +26,10 @@ FLAG_DOOR_PHYSICS = 67108864
 SPECIAL = {"normal": "IS_NORMAL_DOOR", "sliding": "IS_SLIDING_DOOR", "sliding_v": "IS_SLIDING_DOOR_VERTICAL", "garage": "IS_GARAGE_DOOR"}
 SOUND_TYPE = {"normal": 4, "sliding": 0, "sliding_v": 1, "garage": 2}
 SOUND_DEFAULT = {4: "86e5cee2", 0: "5c5c68cb", 1: "098b9ab5", 2: "a04a33e1"}
-MATERIALS = [
-    ("70", "Bois (WOOD_SOLID_MEDIUM)", ""), ("71", "Bois gros (WOOD_SOLID_LARGE)", ""), ("56", "Métal (METAL_SOLID_MEDIUM)", ""),
-    ("67", "Porte de garage (METAL_GARAGE_DOOR)", ""), ("112", "Verre (GLASS_SHOOT_THROUGH)", ""), ("1", "Béton (CONCRETE)", ""),
-    ("87", "Plastique (PLASTIC_HOLLOW)", ""), ("116", "Tôle (CAR_METAL)", ""),
+MATERIALS = [  # (index, French, English, GTA name)
+    ("70", "Bois", "Wood", "WOOD_SOLID_MEDIUM"), ("71", "Bois gros", "Wood large", "WOOD_SOLID_LARGE"), ("56", "Métal", "Metal", "METAL_SOLID_MEDIUM"),
+    ("67", "Porte de garage", "Garage door", "METAL_GARAGE_DOOR"), ("112", "Verre", "Glass", "GLASS_SHOOT_THROUGH"), ("1", "Béton", "Concrete", "CONCRETE"),
+    ("87", "Plastique", "Plastic", "PLASTIC_HOLLOW"), ("116", "Tôle", "Sheet metal", "CAR_METAL"),
 ]
 DOOR_SOUNDS = [
     ("86e5cee2", 4, "Wooden interior door (house / office)"),
@@ -97,6 +97,43 @@ def joaat(s):
 def sanitize(name):
     out = "".join(c if (c.isalnum() or c == "_") else "_" for c in (name or "").strip().lower())
     return out or "my_door"
+
+
+# ---------------------------------------------------------------------------- language (Français / English)
+ADDON_KEY = __package__ or __name__
+
+
+def lang():
+    try:
+        l = bpy.context.preferences.addons[ADDON_KEY].preferences.lang
+    except Exception:
+        l = "AUTO"
+    if l == "AUTO":
+        try:
+            return "FR" if bpy.app.translations.locale.lower().startswith("fr") else "EN"
+        except Exception:
+            return "EN"
+    return l
+
+
+def T(fr, en):
+    return fr if lang() == "FR" else en
+
+
+def _redraw(self, context):
+    for w in getattr(context.window_manager, "windows", []):
+        for a in w.screen.areas:
+            a.tag_redraw()
+
+
+class GDC_Prefs(bpy.types.AddonPreferences):
+    bl_idname = ADDON_KEY
+    lang: EnumProperty(name="Language / Langue",
+                       items=[("AUTO", "Auto (Blender)", "Same language as Blender / Même langue que Blender"), ("FR", "Français", ""), ("EN", "English", "")],
+                       default="AUTO", update=_redraw)
+
+    def draw(self, context):
+        self.layout.prop(self, "lang", expand=True)
 
 
 # ---------------------------------------------------------------------------- door sound (game.dat151.rel)
@@ -290,44 +327,63 @@ def _keep(key, items):
 
 def _sound_items(self, context):
     t = SOUND_TYPE["sliding_v" if (self.door_type == "SLIDING" and self.slide_dir == "UP") or (self.door_type == "GARAGE" and self.garage_kind == "ROLLUP") else self.door_type.lower()]
-    items = [("AUTO", "Auto (son par défaut de ce type)", ""), ("NONE", "Aucun son", "")]
+    items = [("AUTO", T("Auto (son par défaut de ce type)", "Auto (default sound of this type)"), ""), ("NONE", T("Aucun son", "No sound"), "")]
     items += [(sid, label, "") for sid, st, label in DOOR_SOUNDS if st == t]
-    items += [(sid, "(autre type) " + label, "") for sid, st, label in DOOR_SOUNDS if st != t]
-    return _keep(("sound", t), items)
+    items += [(sid, T("(autre type) ", "(other type) ") + label, "") for sid, st, label in DOOR_SOUNDS if st != t]
+    return _keep(("sound", t, lang()), items)
 
 
 def _ytyp_items(self, context):
-    items = [("NEW", "Nouveau ytyp (nom de la porte)", "Crée un .ytyp à part pour cette porte")]
+    items = [("NEW", T("Nouveau ytyp (nom de la porte)", "New ytyp (door name)"), T("Crée un .ytyp à part pour cette porte", "Make a separate .ytyp for this door"))]
     for y in getattr(context.scene, "ytyps", []):
         if y.name:
-            items.append(("Y:" + y.name, y.name, "Ajoute la porte dans ce ytyp (ex. celui de ton MLO, importé avec Sollumz)"))
-    return _keep("ytyp", items)
+            items.append(("Y:" + y.name, y.name, T("Ajoute la porte dans ce ytyp (ex. celui de ton MLO, importé avec Sollumz)", "Add the door to this ytyp (e.g. your MLO one, imported with Sollumz)")))
+    return _keep(("ytyp", lang()), items)
 
 
 def _all_sound_items(self, context):
-    names = {4: "Charnière", 0: "Coulissante", 1: "Verticale", 2: "Garage", 3: "Barrière"}
-    if "all_sounds" not in _ENUM_CACHE:
-        _ENUM_CACHE["all_sounds"] = [(sid, f"{names.get(st, '?')} · {label}", "") for sid, st, label in DOOR_SOUNDS]
-    return _ENUM_CACHE["all_sounds"]
+    l = lang()
+    names = {4: "Charnière", 0: "Coulissante", 1: "Verticale", 2: "Garage", 3: "Barrière"} if l == "FR" else {4: "Hinged", 0: "Sliding", 1: "Vertical", 2: "Garage", 3: "Barrier"}
+    key = ("all_sounds", l)
+    if key not in _ENUM_CACHE:
+        _ENUM_CACHE[key] = [(sid, f"{names.get(st, '?')} · {label}", "") for sid, st, label in DOOR_SOUNDS]
+    return _ENUM_CACHE[key]
+
+
+def _enum(key, rows):
+    """rows = [(id, French, English[, tooltip])] -> items in the current language (kept alive)"""
+    def items(self, context):
+        l = lang()
+        return _keep((key, l), [(r[0], r[1] if l == "FR" else r[2], r[3] if len(r) > 3 else "") for r in rows])
+    return items
+
+
+_TYPE_ITEMS = _enum("type", [("NORMAL", "Normale", "Hinged"), ("SLIDING", "Coulissante", "Sliding"), ("GARAGE", "Garage", "Garage")])
+_HINGE_ITEMS = _enum("hinge", [("LEFT", "Gauche", "Left"), ("RIGHT", "Droite", "Right")])
+_SLIDE_ITEMS = _enum("slide", [("LEFT", "Gauche", "Left"), ("RIGHT", "Droite", "Right"), ("UP", "Haut", "Up")])
+_GARAGE_ITEMS = _enum("garage", [("SECTIONAL", "Sectionnelle", "Sectional", "specialAttribute 5"), ("ROLLUP", "Enroulable / levante", "Roll-up / lift", "specialAttribute 10")])
+_COL_ITEMS = _enum("col", [("BOX", "Boîte (recommandé)", "Box (recommended)"), ("KEEP", "Garder la mienne", "Keep mine"), ("NONE", "Aucune", "None")])
+_MAT_ITEMS = _enum("mat", [(m[0], f"{m[1]} ({m[3]})", f"{m[2]} ({m[3]})") for m in MATERIALS])
 
 
 class GDC_Props(bpy.types.PropertyGroup):
-    name: StringProperty(name="Nom", default="my_door", description="Nom du modèle et de l'archétype (évite les noms GTA vanilla)")
-    door_type: EnumProperty(name="Type", items=[("NORMAL", "Normale", "Porte à charnière"), ("SLIDING", "Coulissante", "Porte coulissante"), ("GARAGE", "Garage", "Porte de garage")], default="NORMAL")
-    hinge: EnumProperty(name="Charnière", items=[("LEFT", "Gauche", ""), ("RIGHT", "Droite", "")], default="LEFT")
-    flip: BoolProperty(name="Inverser le sens (aperçu)", default=False)
-    angle: FloatProperty(name="Angle d'ouverture", default=90, min=10, max=180, update=_preview_update)
-    slide_dir: EnumProperty(name="Glisse vers", items=[("LEFT", "Gauche", ""), ("RIGHT", "Droite", ""), ("UP", "Haut", "")], default="RIGHT")
-    garage_kind: EnumProperty(name="Garage", items=[("SECTIONAL", "Sectionnelle", "specialAttribute 5"), ("ROLLUP", "Enroulable / levante", "specialAttribute 10")], default="SECTIONAL")
-    collision: EnumProperty(name="Collision", items=[("BOX", "Boîte (recommandé)", "Une boîte de collision, idéal pour les portes dynamiques"), ("KEEP", "Garder la mienne", "Garde la collision déjà dans le drawable"), ("NONE", "Aucune", "")], default="BOX")
-    material: EnumProperty(name="Matériau", items=MATERIALS, default="70")
-    sound: EnumProperty(name="Son", items=_sound_items)
-    lod_dist: FloatProperty(name="Distance LOD", default=100, min=10, max=1000)
-    ytyp_target: EnumProperty(name="YTYP", items=_ytyp_items, description="Nouveau ytyp, ou ton propre ytyp déjà dans la scène")
-    so_names: StringProperty(name="Portes", description="Noms des modèles de portes déjà faites (séparés par des virgules)")
-    so_sound: EnumProperty(name="Son", items=_all_sound_items)
-    so_file: StringProperty(name="Fichier", default="door_sounds", description="Nom du fichier son (…_game.dat151.rel)")
-    preview: FloatProperty(name="Ouverture", default=0, min=0, max=1, subtype="FACTOR", update=_preview_update)
+    # labels are drawn by the panel in the chosen language; tooltips are bilingual
+    name: StringProperty(name="Name", default="my_door", description="Nom du modèle et de l'archétype / Model and archetype name (avoid vanilla GTA names)")
+    door_type: EnumProperty(name="Type", items=_TYPE_ITEMS, default=0)
+    hinge: EnumProperty(name="Hinge", items=_HINGE_ITEMS, default=0)
+    flip: BoolProperty(name="Flip", default=False, description="Inverser le sens (aperçu) / Flip the direction (preview)")
+    angle: FloatProperty(name="Angle", default=90, min=10, max=180, update=_preview_update)
+    slide_dir: EnumProperty(name="Slide", items=_SLIDE_ITEMS, default=1)
+    garage_kind: EnumProperty(name="Garage", items=_GARAGE_ITEMS, default=0)
+    collision: EnumProperty(name="Collision", items=_COL_ITEMS, default=0)
+    material: EnumProperty(name="Material", items=_MAT_ITEMS, default=0)
+    sound: EnumProperty(name="Sound", items=_sound_items)
+    lod_dist: FloatProperty(name="LOD", default=100, min=10, max=1000)
+    ytyp_target: EnumProperty(name="YTYP", items=_ytyp_items, description="Nouveau ytyp, ou ton propre ytyp / New ytyp, or your own ytyp")
+    so_names: StringProperty(name="Doors", description="Noms des portes déjà faites, séparés par des virgules / Names of doors already made, comma separated")
+    so_sound: EnumProperty(name="Sound", items=_all_sound_items)
+    so_file: StringProperty(name="File", default="door_sounds", description="…_game.dat151.rel")
+    preview: FloatProperty(name="Open", default=0, min=0, max=1, subtype="FACTOR", update=_preview_update)
     drawable_name: StringProperty()
     info: StringProperty()
 
@@ -336,13 +392,13 @@ class GDC_Props(bpy.types.PropertyGroup):
 class GDC_OT_detect(bpy.types.Operator):
     bl_idname = "gdc.detect"
     bl_label = "Détection auto"
-    bl_description = "Devine le type de porte et le côté de la charnière (poignée, taille, nom)"
+    bl_description = "Devine le type et la charnière / Guess the door type and the hinge side (handle, size, name)"
 
     def execute(self, context):
         p = context.scene.gdc
         d, meshes = door_meshes(context)
         if not meshes:
-            self.report({"ERROR"}, "Sélectionne ton modèle de porte (mesh ou Drawable Sollumz)")
+            self.report({"ERROR"}, T("Sélectionne ton modèle de porte (mesh ou Drawable Sollumz)", "Select your door model (mesh or Sollumz Drawable)"))
             return {"CANCELLED"}
         an = analyze(world_points(meshes))
         base_name = (d.name if d else meshes[0].name).split(".")[0]
@@ -351,7 +407,8 @@ class GDC_OT_detect(bpy.types.Operator):
         if p.name in ("", "my_door"):
             p.name = sanitize(base_name)
         W, H = an["size"][an["wa"]], an["size"].z
-        p.info = f"{W:.2f} × {H:.2f} m · {'poignée trouvée' if an['handle'] else 'pas de poignée'} → {kind.lower()}, charnière {hinge.lower()}"
+        p.info = T(f"{W:.2f} × {H:.2f} m · {'poignée trouvée' if an['handle'] else 'pas de poignée'} → {kind.lower()}, charnière {'gauche' if hinge == 'LEFT' else 'droite'}",
+                   f"{W:.2f} × {H:.2f} m · {'handle found' if an['handle'] else 'no handle'} → {kind.lower()}, hinge {hinge.lower()}")
         self.report({"INFO"}, p.info)
         return {"FINISHED"}
 
@@ -359,12 +416,12 @@ class GDC_OT_detect(bpy.types.Operator):
 class GDC_OT_make(bpy.types.Operator):
     bl_idname = "gdc.make"
     bl_label = "Créer la porte"
-    bl_description = "Place l'origine sur le pivot, crée le Drawable, la collision et l'archétype YTYP (Sollumz)"
+    bl_description = "Origine sur le pivot, Drawable, collision, archétype YTYP / Origin on the pivot, Drawable, collision, YTYP archetype (Sollumz)"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
         if not is_sollumz():
-            self.report({"ERROR"}, "Sollumz n'est pas activé - installe / active Sollumz d'abord")
+            self.report({"ERROR"}, T("Sollumz n'est pas activé - installe / active Sollumz d'abord", "Sollumz is not enabled - install / enable Sollumz first"))
             return {"CANCELLED"}
         p = context.scene.gdc
         name = sanitize(p.name)
@@ -373,7 +430,7 @@ class GDC_OT_make(bpy.types.Operator):
             bpy.ops.object.mode_set(mode="OBJECT")
         drawable, meshes = door_meshes(context)
         if not meshes:
-            self.report({"ERROR"}, "Sélectionne ton modèle de porte (mesh ou Drawable Sollumz)")
+            self.report({"ERROR"}, T("Sélectionne ton modèle de porte (mesh ou Drawable Sollumz)", "Select your door model (mesh or Sollumz Drawable)"))
             return {"CANCELLED"}
         # reset an older preview
         if drawable and "gdc_base" in drawable:
@@ -404,7 +461,7 @@ class GDC_OT_make(bpy.types.Operator):
             bpy.ops.sollumz.converttodrawable()
             drawable = find_drawable(meshes[0])
             if drawable is None:
-                self.report({"ERROR"}, "Sollumz n'a pas pu créer le Drawable")
+                self.report({"ERROR"}, T("Sollumz n'a pas pu créer le Drawable", "Sollumz could not create the Drawable"))
                 return {"CANCELLED"}
             drawable.matrix_world = Matrix.Identity(4)
         else:
@@ -457,7 +514,7 @@ class GDC_OT_make(bpy.types.Operator):
         bpy.ops.sollumz.createarchetypefromselected()
         arch = next((a for a in y.archetypes if a.name == name), None)
         if arch is None:
-            self.report({"ERROR"}, "Sollumz n'a pas créé l'archétype")
+            self.report({"ERROR"}, T("Sollumz n'a pas créé l'archétype", "Sollumz did not create the archetype"))
             return {"CANCELLED"}
         kind = "normal" if p.door_type == "NORMAL" else ("sliding_v" if p.slide_dir == "UP" else "sliding") if p.door_type == "SLIDING" else ("garage" if p.garage_kind == "SECTIONAL" else "sliding_v")
         arch.flags.total = str(FLAG_DYNAMIC | FLAG_DOOR_PHYSICS)
@@ -475,7 +532,8 @@ class GDC_OT_make(bpy.types.Operator):
         p.drawable_name = drawable.name
         drawable["gdc_ytyp"] = target
         p.preview = 0
-        p.info = f"Porte prête : {name} · {SPECIAL[kind].lower()} · collision {p.collision.lower()} · ytyp {target}"
+        p.info = T(f"Porte prête : {name} · {SPECIAL[kind].lower()} · collision {p.collision.lower()} · ytyp {target}",
+                   f"Door ready: {name} · {SPECIAL[kind].lower()} · collision {p.collision.lower()} · ytyp {target}")
         self.report({"INFO"}, p.info)
         return {"FINISHED"}
 
@@ -524,7 +582,7 @@ class GDC_OT_make(bpy.types.Operator):
 class GDC_OT_preview_reset(bpy.types.Operator):
     bl_idname = "gdc.preview_reset"
     bl_label = "Fermer"
-    bl_description = "Remet la porte fermée"
+    bl_description = "Remet la porte fermée / Close the door again"
 
     def execute(self, context):
         context.scene.gdc.preview = 0
@@ -545,7 +603,7 @@ def manifest(name, ytyp, audio, sound_label):
 class GDC_OT_export(bpy.types.Operator):
     bl_idname = "gdc.export"
     bl_label = "Exporter la ressource FiveM"
-    bl_description = "Crée <nom>/stream (ydr + ytyp via Sollumz), audio (son) et fxmanifest.lua"
+    bl_description = "<name>/stream (ydr + ytyp via Sollumz), audio, fxmanifest.lua"
 
     directory: StringProperty(subtype="DIR_PATH")
 
@@ -557,7 +615,7 @@ class GDC_OT_export(bpy.types.Operator):
         p = context.scene.gdc
         d = bpy.data.objects.get(p.drawable_name)
         if not d:
-            self.report({"ERROR"}, "Clique d'abord sur « Créer la porte »")
+            self.report({"ERROR"}, T("Clique d'abord sur « Créer la porte »", "Click « Make the door » first"))
             return {"CANCELLED"}
         p.preview = 0
         name = d.name
@@ -607,13 +665,15 @@ class GDC_OT_export(bpy.types.Operator):
                     f"3. In-game it is a GTA door (no script){', with the sound: ' + label if audio else ''}.\n\n"
                     "AFTER CHANGING THE FILES: disconnect and reconnect to the server (a restart is not enough).\n")
         if xml_only:
-            msg = "Sollumz a exporté en XML (.ydr.xml / .ytyp.xml) : active « Native » (PyMateria) dans les préférences Sollumz, ou convertis les .xml avec CodeWalker"
+            msg = T("Sollumz a exporté en XML (.ydr.xml / .ytyp.xml) : active « Native » (PyMateria) dans les préférences Sollumz, ou convertis les .xml avec CodeWalker",
+                    "Sollumz exported XML (.ydr.xml / .ytyp.xml): enable « Native » (PyMateria) in the Sollumz preferences, or convert the .xml with CodeWalker")
             self.report({"WARNING"}, msg)
             p.info = msg
         else:
-            p.info = f"Ressource prête : {root}  ({', '.join(files) or 'aucun fichier exporté ?'})"
+            p.info = T(f"Ressource prête : {root}  ({', '.join(files) or 'aucun fichier exporté ?'})", f"Resource ready: {root}  ({', '.join(files) or 'no file exported?'})")
             if ytyp_name != name:
-                p.info += f"  ·  {ytyp} = TON ytyp + la porte : utilise-le à la place de l'original (ne streame jamais les deux)"
+                p.info += T(f"  ·  {ytyp} = TON ytyp + la porte : utilise-le à la place de l'original (ne streame jamais les deux)",
+                            f"  ·  {ytyp} = YOUR ytyp + the door: use it instead of the original (never stream both)")
             self.report({"INFO"}, p.info)
         return {"FINISHED"}
 
@@ -621,7 +681,7 @@ class GDC_OT_export(bpy.types.Operator):
 class GDC_OT_import_ytyp(bpy.types.Operator):
     bl_idname = "gdc.import_ytyp"
     bl_label = "Importer mon .ytyp…"
-    bl_description = "Importe ton .ytyp (ex. celui de ton MLO) avec Sollumz pour y ajouter la porte"
+    bl_description = "Importe ton .ytyp avec Sollumz / Import your .ytyp (e.g. your MLO one) with Sollumz"
 
     def execute(self, context):
         bpy.ops.sollumz.import_assets("INVOKE_DEFAULT")
@@ -631,7 +691,7 @@ class GDC_OT_import_ytyp(bpy.types.Operator):
 class GDC_OT_sound_pick(bpy.types.Operator):
     bl_idname = "gdc.sound_pick"
     bl_label = "Prendre la sélection"
-    bl_description = "Met les noms des objets / Drawables sélectionnés dans la liste"
+    bl_description = "Noms des objets sélectionnés / Use the names of the selected objects"
 
     def execute(self, context):
         names = []
@@ -647,7 +707,7 @@ class GDC_OT_sound_pick(bpy.types.Operator):
 class GDC_OT_sound_only(bpy.types.Operator):
     bl_idname = "gdc.sound_only"
     bl_label = "Créer le fichier son"
-    bl_description = "Seulement le son : crée <fichier>_game.dat151.rel pour des portes déjà faites (rien d'autre n'est exporté)"
+    bl_description = "Seulement le son / Sound only: <file>_game.dat151.rel for doors already made"
 
     directory: StringProperty(subtype="DIR_PATH")
 
@@ -663,7 +723,7 @@ class GDC_OT_sound_only(bpy.types.Operator):
             if n and n not in names:
                 names.append(n)
         if not names:
-            self.report({"ERROR"}, "Mets au moins un nom de porte")
+            self.report({"ERROR"}, T("Mets au moins un nom de porte", "Type at least one door name"))
             return {"CANCELLED"}
         base = sanitize(p.so_file or "door_sounds")
         file = f"{base}_game.dat151.rel"
@@ -678,7 +738,8 @@ class GDC_OT_sound_only(bpy.types.Operator):
         with open(os.path.join(folder, base + "_fxmanifest_lines.txt"), "w", encoding="utf-8") as f:
             f.write(lines)
         context.window_manager.clipboard = lines
-        p.info = f"Son créé : {file} pour {len(names)} porte(s) · lignes fxmanifest copiées (Ctrl+V) · mets le fichier dans audio/ de ta ressource"
+        p.info = T(f"Son créé : {file} pour {len(names)} porte(s) · lignes fxmanifest copiées (Ctrl+V) · mets le fichier dans audio/ de ta ressource",
+                   f"Sound made: {file} for {len(names)} door(s) · fxmanifest lines copied (Ctrl+V) · put the file in your resource's audio/")
         self.report({"INFO"}, p.info)
         return {"FINISHED"}
 
@@ -694,21 +755,27 @@ class GDC_PT_panel(bpy.types.Panel):
     def draw(self, context):
         lay = self.layout
         p = context.scene.gdc
+        row = lay.row(align=True)
+        try:
+            row.prop(context.preferences.addons[ADDON_KEY].preferences, "lang", expand=True)
+        except Exception:
+            pass
         if not is_sollumz():
-            lay.label(text="Sollumz n'est pas activé", icon="ERROR")
-            lay.label(text="Installe Sollumz puis réactive cet add-on")
+            lay.label(text=T("Sollumz n'est pas activé", "Sollumz is not enabled"), icon="ERROR")
+            lay.label(text=T("Installe Sollumz puis réactive cet add-on", "Install Sollumz then enable this add-on again"))
             return
         box = lay.box()
-        box.label(text="1 · Ton modèle", icon="MESH_CUBE")
+        box.label(text=T("1 · Ton modèle", "1 · Your model"), icon="MESH_CUBE")
         d, meshes = door_meshes(context)
-        box.label(text=(f"{d.name} (Drawable)" if d else f"{len(meshes)} mesh sélectionné(s)") if meshes else "Sélectionne ta porte", icon="CHECKMARK" if meshes else "INFO")
-        box.operator("gdc.detect", icon="VIEWZOOM")
+        box.label(text=(f"{d.name} (Drawable)" if d else T(f"{len(meshes)} mesh sélectionné(s)", f"{len(meshes)} mesh(es) selected")) if meshes else T("Sélectionne ta porte", "Select your door"),
+                  icon="CHECKMARK" if meshes else "INFO")
+        box.operator("gdc.detect", text=T("Détection auto", "Auto detect"), icon="VIEWZOOM")
         if p.info:
             box.label(text=p.info)
 
         box = lay.box()
-        box.label(text="2 · Réglages", icon="PREFERENCES")
-        box.prop(p, "name")
+        box.label(text=T("2 · Réglages", "2 · Settings"), icon="PREFERENCES")
+        box.prop(p, "name", text=T("Nom", "Name"))
         box.prop(p, "door_type", expand=True)
         if p.door_type == "NORMAL":
             box.prop(p, "hinge", expand=True)
@@ -716,48 +783,47 @@ class GDC_PT_panel(bpy.types.Panel):
             box.prop(p, "slide_dir", expand=True)
         else:
             box.prop(p, "garage_kind", expand=True)
-        box.prop(p, "collision")
+        box.prop(p, "collision", text=T("Collision", "Collision"))
         if p.collision == "BOX":
-            box.prop(p, "material")
-        box.prop(p, "sound")
-        box.prop(p, "lod_dist")
+            box.prop(p, "material", text=T("Matériau", "Material"))
+        box.prop(p, "sound", text=T("Son", "Sound"))
+        box.prop(p, "lod_dist", text=T("Distance LOD", "LOD distance"))
         row = box.row(align=True)
         row.prop(p, "ytyp_target", text="YTYP")
         row.operator("gdc.import_ytyp", text="", icon="IMPORT")
         if p.ytyp_target not in ("", "NEW"):
-            box.label(text="La porte sera ajoutée dans ton ytyp (MLO gardé)", icon="INFO")
-        box.operator("gdc.make", icon="MOD_BUILD")
+            box.label(text=T("La porte sera ajoutée dans ton ytyp (MLO gardé)", "The door goes into your ytyp (MLO kept)"), icon="INFO")
+        box.operator("gdc.make", text=T("Créer la porte", "Make the door"), icon="MOD_BUILD")
 
         box = lay.box()
-        box.label(text="3 · Aperçu", icon="PLAY")
+        box.label(text=T("3 · Aperçu", "3 · Preview"), icon="PLAY")
         col = box.column()
         col.enabled = bool(p.drawable_name and bpy.data.objects.get(p.drawable_name))
-        col.prop(p, "preview", slider=True)
+        col.prop(p, "preview", text=T("Ouverture", "Open"), slider=True)
         if p.door_type == "NORMAL":
             row = col.row()
-            row.prop(p, "angle")
+            row.prop(p, "angle", text=T("Angle d'ouverture", "Opening angle"))
             row.prop(p, "flip", text="", icon="ARROW_LEFTRIGHT")
-        col.operator("gdc.preview_reset", icon="LOOP_BACK")
-        col.label(text="(seulement dans Blender : en jeu c'est le système de portes GTA)")
+        col.operator("gdc.preview_reset", text=T("Fermer", "Close"), icon="LOOP_BACK")
+        col.label(text=T("(seulement dans Blender : en jeu c'est le système de portes GTA)", "(Blender only: in-game the GTA door system moves it)"))
 
         box = lay.box()
-        box.label(text="4 · Export", icon="EXPORT")
+        box.label(text=T("4 · Export", "4 · Export"), icon="EXPORT")
         row = box.row()
         row.enabled = bool(p.drawable_name and bpy.data.objects.get(p.drawable_name))
         row.scale_y = 1.4
-        row.operator("gdc.export", icon="FILE_FOLDER")
+        row.operator("gdc.export", text=T("Exporter la ressource FiveM", "Export FiveM resource"), icon="FILE_FOLDER")
 
         box = lay.box()
-        box.label(text="♪ Son seulement (porte déjà faite)", icon="SPEAKER")
+        box.label(text=T("Son seulement (porte déjà faite)", "Sound only (door already made)"), icon="SPEAKER")
         row = box.row(align=True)
-        row.prop(p, "so_names")
+        row.prop(p, "so_names", text=T("Portes", "Doors"))
         row.operator("gdc.sound_pick", text="", icon="RESTRICT_SELECT_OFF")
-        box.prop(p, "so_sound")
-        box.prop(p, "so_file")
-        box.operator("gdc.sound_only", icon="FILE_SOUND")
+        box.prop(p, "so_sound", text=T("Son", "Sound"))
+        box.prop(p, "so_file", text=T("Fichier", "File"))
+        box.operator("gdc.sound_only", text=T("Créer le fichier son", "Make the sound file"), icon="FILE_SOUND")
 
-
-classes = (GDC_Props, GDC_OT_detect, GDC_OT_make, GDC_OT_preview_reset, GDC_OT_export, GDC_OT_import_ytyp, GDC_OT_sound_pick, GDC_OT_sound_only, GDC_PT_panel)
+classes = (GDC_Prefs, GDC_Props, GDC_OT_detect, GDC_OT_make, GDC_OT_preview_reset, GDC_OT_export, GDC_OT_import_ytyp, GDC_OT_sound_pick, GDC_OT_sound_only, GDC_PT_panel)
 
 
 def register():
