@@ -5,7 +5,7 @@
 bl_info = {
     "name": "GTA Door Creator (Sollumz)",
     "author": "byfred",
-    "version": (1, 0, 0),
+    "version": (1, 1, 0),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar (N) > Door Creator",
     "description": "Make GTA V / FiveM doors: pivot, collision, ytyp, sound and FiveM resource - with Sollumz",
@@ -286,6 +286,19 @@ def _sound_items(self, context):
     return items
 
 
+def _ytyp_items(self, context):
+    items = [("NEW", "Nouveau ytyp (nom de la porte)", "Crée un .ytyp à part pour cette porte")]
+    for y in getattr(context.scene, "ytyps", []):
+        if y.name:
+            items.append(("Y:" + y.name, y.name, "Ajoute la porte dans ce ytyp (ex. celui de ton MLO, importé avec Sollumz)"))
+    return items
+
+
+def _all_sound_items(self, context):
+    names = {4: "Charnière", 0: "Coulissante", 1: "Verticale", 2: "Garage", 3: "Barrière"}
+    return [(sid, f"{names.get(st, '?')} · {label}", "") for sid, st, label in DOOR_SOUNDS]
+
+
 class GDC_Props(bpy.types.PropertyGroup):
     name: StringProperty(name="Nom", default="my_door", description="Nom du modèle et de l'archétype (évite les noms GTA vanilla)")
     door_type: EnumProperty(name="Type", items=[("NORMAL", "Normale", "Porte à charnière"), ("SLIDING", "Coulissante", "Porte coulissante"), ("GARAGE", "Garage", "Porte de garage")], default="NORMAL")
@@ -298,6 +311,10 @@ class GDC_Props(bpy.types.PropertyGroup):
     material: EnumProperty(name="Matériau", items=MATERIALS, default="70")
     sound: EnumProperty(name="Son", items=_sound_items)
     lod_dist: FloatProperty(name="Distance LOD", default=100, min=10, max=1000)
+    ytyp_target: EnumProperty(name="YTYP", items=_ytyp_items, description="Nouveau ytyp, ou ton propre ytyp déjà dans la scène")
+    so_names: StringProperty(name="Portes", description="Noms des modèles de portes déjà faites (séparés par des virgules)")
+    so_sound: EnumProperty(name="Son", items=_all_sound_items)
+    so_file: StringProperty(name="Fichier", default="door_sounds", description="Nom du fichier son (…_game.dat151.rel)")
     preview: FloatProperty(name="Ouverture", default=0, min=0, max=1, subtype="FACTOR", update=_preview_update)
     drawable_name: StringProperty()
     info: StringProperty()
@@ -406,10 +423,11 @@ class GDC_OT_make(bpy.types.Operator):
 
         # ---- ytyp + archetype
         sc = context.scene
-        yi = next((i for i, y in enumerate(sc.ytyps) if y.name == name), -1)
+        target = name if p.ytyp_target in ("", "NEW") else p.ytyp_target[2:]
+        yi = next((i for i, y in enumerate(sc.ytyps) if y.name == target), -1)
         if yi < 0:
             y = sc.ytyps.add()
-            y.name = name
+            y.name = target
             yi = len(sc.ytyps) - 1
         sc.ytyp_index = yi
         y = sc.ytyps[yi]
@@ -443,8 +461,9 @@ class GDC_OT_make(bpy.types.Operator):
         drawable["gdc_width"] = an["size"][an["wa"]]
         drawable["gdc_height"] = an["size"].z
         p.drawable_name = drawable.name
+        drawable["gdc_ytyp"] = target
         p.preview = 0
-        p.info = f"Porte prête : {name} · {SPECIAL[kind].lower()} · collision {p.collision.lower()}"
+        p.info = f"Porte prête : {name} · {SPECIAL[kind].lower()} · collision {p.collision.lower()} · ytyp {target}"
         self.report({"INFO"}, p.info)
         return {"FINISHED"}
 
@@ -534,7 +553,8 @@ class GDC_OT_export(bpy.types.Operator):
         stream = os.path.join(root, "stream")
         os.makedirs(stream, exist_ok=True)
         sc = context.scene
-        yi = next((i for i, y in enumerate(sc.ytyps) if y.name == name), -1)
+        ytyp_name = d.get("gdc_ytyp", name)
+        yi = next((i for i, y in enumerate(sc.ytyps) if y.name == ytyp_name), -1)
         if yi >= 0:
             sc.ytyp_index = yi
         if context.object and context.object.mode != "OBJECT":
@@ -565,7 +585,7 @@ class GDC_OT_export(bpy.types.Operator):
             os.makedirs(os.path.join(root, "audio"), exist_ok=True)
             with open(os.path.join(root, "audio", audio), "wb") as f:
                 f.write(build_door_audio_rel([(name, sid)]))
-        ytyp = f"{name}.ytyp"
+        ytyp = f"{ytyp_name}.ytyp"
         with open(os.path.join(root, "fxmanifest.lua"), "w", encoding="utf-8") as f:
             f.write(manifest(name, ytyp, audio, label))
         with open(os.path.join(root, "README.txt"), "w", encoding="utf-8") as f:
@@ -580,7 +600,74 @@ class GDC_OT_export(bpy.types.Operator):
             p.info = msg
         else:
             p.info = f"Ressource prête : {root}  ({', '.join(files) or 'aucun fichier exporté ?'})"
+            if ytyp_name != name:
+                p.info += f"  ·  {ytyp} = TON ytyp + la porte : utilise-le à la place de l'original (ne streame jamais les deux)"
             self.report({"INFO"}, p.info)
+        return {"FINISHED"}
+
+
+class GDC_OT_import_ytyp(bpy.types.Operator):
+    bl_idname = "gdc.import_ytyp"
+    bl_label = "Importer mon .ytyp…"
+    bl_description = "Importe ton .ytyp (ex. celui de ton MLO) avec Sollumz pour y ajouter la porte"
+
+    def execute(self, context):
+        bpy.ops.sollumz.import_assets("INVOKE_DEFAULT")
+        return {"FINISHED"}
+
+
+class GDC_OT_sound_pick(bpy.types.Operator):
+    bl_idname = "gdc.sound_pick"
+    bl_label = "Prendre la sélection"
+    bl_description = "Met les noms des objets / Drawables sélectionnés dans la liste"
+
+    def execute(self, context):
+        names = []
+        for o in context.selected_objects:
+            d = find_drawable(o) or o
+            n = sanitize(d.name.split(".")[0])
+            if n not in names:
+                names.append(n)
+        context.scene.gdc.so_names = ", ".join(names)
+        return {"FINISHED"}
+
+
+class GDC_OT_sound_only(bpy.types.Operator):
+    bl_idname = "gdc.sound_only"
+    bl_label = "Créer le fichier son"
+    bl_description = "Seulement le son : crée <fichier>_game.dat151.rel pour des portes déjà faites (rien d'autre n'est exporté)"
+
+    directory: StringProperty(subtype="DIR_PATH")
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {"RUNNING_MODAL"}
+
+    def execute(self, context):
+        p = context.scene.gdc
+        names = []
+        for n in p.so_names.replace(";", ",").replace("\n", ",").split(","):
+            n = sanitize(n) if n.strip() else ""
+            if n and n not in names:
+                names.append(n)
+        if not names:
+            self.report({"ERROR"}, "Mets au moins un nom de porte")
+            return {"CANCELLED"}
+        base = sanitize(p.so_file or "door_sounds")
+        file = f"{base}_game.dat151.rel"
+        folder = bpy.path.abspath(self.directory)
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, file), "wb") as f:
+            f.write(build_door_audio_rel([(n, p.so_sound) for n in names]))
+        label = next((l for s_, _, l in DOOR_SOUNDS if s_ == p.so_sound), p.so_sound)
+        lines = (f"-- GTA Door Creator : door sound ({', '.join(names)}) - {label}\n"
+                 f"files {{\n  'audio/{file}',\n}}\n"
+                 f"data_file 'AUDIO_GAMEDATA' 'audio/{file.replace('.dat151.rel', '.dat')}'\n")
+        with open(os.path.join(folder, base + "_fxmanifest_lines.txt"), "w", encoding="utf-8") as f:
+            f.write(lines)
+        context.window_manager.clipboard = lines
+        p.info = f"Son créé : {file} pour {len(names)} porte(s) · lignes fxmanifest copiées (Ctrl+V) · mets le fichier dans audio/ de ta ressource"
+        self.report({"INFO"}, p.info)
         return {"FINISHED"}
 
 
@@ -622,6 +709,11 @@ class GDC_PT_panel(bpy.types.Panel):
             box.prop(p, "material")
         box.prop(p, "sound")
         box.prop(p, "lod_dist")
+        row = box.row(align=True)
+        row.prop(p, "ytyp_target", text="YTYP")
+        row.operator("gdc.import_ytyp", text="", icon="IMPORT")
+        if p.ytyp_target not in ("", "NEW"):
+            box.label(text="La porte sera ajoutée dans ton ytyp (MLO gardé)", icon="INFO")
         box.operator("gdc.make", icon="MOD_BUILD")
 
         box = lay.box()
@@ -643,8 +735,17 @@ class GDC_PT_panel(bpy.types.Panel):
         row.scale_y = 1.4
         row.operator("gdc.export", icon="FILE_FOLDER")
 
+        box = lay.box()
+        box.label(text="♪ Son seulement (porte déjà faite)", icon="SPEAKER")
+        row = box.row(align=True)
+        row.prop(p, "so_names")
+        row.operator("gdc.sound_pick", text="", icon="RESTRICT_SELECT_OFF")
+        box.prop(p, "so_sound")
+        box.prop(p, "so_file")
+        box.operator("gdc.sound_only", icon="FILE_SOUND")
 
-classes = (GDC_Props, GDC_OT_detect, GDC_OT_make, GDC_OT_preview_reset, GDC_OT_export, GDC_PT_panel)
+
+classes = (GDC_Props, GDC_OT_detect, GDC_OT_make, GDC_OT_preview_reset, GDC_OT_export, GDC_OT_import_ytyp, GDC_OT_sound_pick, GDC_OT_sound_only, GDC_PT_panel)
 
 
 def register():
