@@ -5,7 +5,7 @@
 bl_info = {
     "name": "GTA Door Creator (Sollumz)",
     "author": "byfred",
-    "version": (1, 2, 0),
+    "version": (1, 2, 1),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar (N) > Door Creator",
     "description": "Make GTA V / FiveM doors: pivot, collision, ytyp, sound and FiveM resource - with Sollumz",
@@ -776,13 +776,13 @@ class GDC_PT_panel(bpy.types.Panel):
         box = lay.box()
         box.label(text=T("2 · Réglages", "2 · Settings"), icon="PREFERENCES")
         box.prop(p, "name", text=T("Nom", "Name"))
-        box.prop(p, "door_type", expand=True)
+        box.row(align=True).prop(p, "door_type", expand=True)
         if p.door_type == "NORMAL":
-            box.prop(p, "hinge", expand=True)
+            box.row(align=True).prop(p, "hinge", expand=True)
         elif p.door_type == "SLIDING":
-            box.prop(p, "slide_dir", expand=True)
+            box.row(align=True).prop(p, "slide_dir", expand=True)
         else:
-            box.prop(p, "garage_kind", expand=True)
+            box.row(align=True).prop(p, "garage_kind", expand=True)
         box.prop(p, "collision", text=T("Collision", "Collision"))
         if p.collision == "BOX":
             box.prop(p, "material", text=T("Matériau", "Material"))

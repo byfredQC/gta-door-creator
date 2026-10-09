@@ -149,6 +149,8 @@ Not affiliated with Rockstar Games or Cfx.re.
 
 ## Blender add-on (doors)
 
+**📖 Tutorial (FR / EN): [blender/README.md](blender/README.md)** · download **`GTA-Door-Creator-Blender.zip`** from [Releases](../../releases).
+
 `blender/gta_door_creator.py` - the door tool inside Blender, built on **Sollumz** (needed, with PyMateria for direct binary export).
 
 Install: Blender › Edit › Preferences › Add-ons › ⌄ › *Install from Disk…* › `gta_door_creator.py`, enable it. Sidebar (N) › **Door Creator**:

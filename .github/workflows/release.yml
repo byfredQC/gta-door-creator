@@ -32,6 +32,14 @@ jobs:
       - name: Build app (installer + portable zip)
         run: npm run dist:win
 
+      - name: Package the Blender add-on (zip to install from Blender)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build-blender/gta_door_creator | Out-Null
+          Copy-Item blender/gta_door_creator.py build-blender/gta_door_creator/__init__.py
+          Copy-Item blender/README.md build-blender/gta_door_creator/README.md
+          Compress-Archive -Path build-blender/gta_door_creator -DestinationPath dist/GTA-Door-Creator-Blender.zip -Force
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
