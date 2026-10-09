@@ -146,3 +146,15 @@ build/                icons
 MIT © Fred — see [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 Built on [CodeWalker](https://github.com/dexyfex/CodeWalker) by dexyfex and [three.js](https://threejs.org).
 Not affiliated with Rockstar Games or Cfx.re.
+
+## Blender add-on (doors)
+
+`blender/gta_door_creator.py` - the door tool inside Blender, built on **Sollumz** (needed, with PyMateria for direct binary export).
+
+Install: Blender › Edit › Preferences › Add-ons › ⌄ › *Install from Disk…* › `gta_door_creator.py`, enable it. Sidebar (N) › **Door Creator**:
+
+1. Select your door (mesh(es) or a Sollumz Drawable) › **Détection auto** (type + hinge side, handle detection)
+2. Name, type (normal / sliding / garage), hinge or direction, collision (box + material), GTA door sound, LOD
+3. **Créer la porte**: origin on the pivot, Sollumz Drawable, box collision, YTYP archetype (flags 67239936 + specialAttribute 7/8/10/5)
+4. Preview slider (opening in Blender only)
+5. **Exporter la ressource FiveM**: `stream/` (.ydr + .ytyp via Sollumz), `audio/<name>_game.dat151.rel` (door sound), `fxmanifest.lua`, README
