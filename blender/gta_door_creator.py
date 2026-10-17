@@ -5,7 +5,7 @@
 bl_info = {
     "name": "GTA Door Creator (Sollumz)",
     "author": "byfred",
-    "version": (1, 4, 2),
+    "version": (1, 4, 3),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar (N) > Sollumz Tools > GTA Door Creator",
     "description": "Make GTA V / FiveM doors: pivot, collision, ytyp, sound and FiveM resource - with Sollumz",
@@ -316,6 +316,27 @@ def pivot_point(an, props):
     return p
 
 
+def normalize_drawable(drawable, piv, turn):
+    """Plain local space for every Sollumz version: the Drawable has no rotation and its models have identity
+    transforms, the geometry itself is expressed in the door frame (pivot + turn). Objects rotated by an import
+    (FBX / OBJ often add 90° on X) or a rotated Drawable made CodeWalker show the model and its box crossed."""
+    frame = Matrix.Translation(piv) @ turn
+    fix = Matrix.Translation(piv) @ turn.inverted() @ Matrix.Translation(-piv)   # how the door turns in Blender
+    kids = list(drawable.children)
+    worlds = {c: c.matrix_world.copy() for c in kids}
+    drawable.matrix_world = Matrix.Translation(piv)
+    for c in kids:
+        if c.type == "MESH" and getattr(c, "sollum_type", "") == "sollumz_drawable_model":
+            if c.data.users > 1:
+                c.data = c.data.copy()
+            c.data.transform(frame.inverted() @ worlds[c])
+            c.data.update()
+            c.matrix_parent_inverse = Matrix.Identity(4)
+            c.matrix_basis = Matrix.Identity(4)
+        else:
+            c.matrix_world = fix @ worlds[c]
+
+
 def is_side_slide(props):
     return props.door_type == "SLIDING" and props.slide_dir in ("LEFT", "RIGHT")
 
@@ -528,6 +549,8 @@ class GDC_OT_make(bpy.types.Operator):
             for c, m in kids:
                 c.matrix_world = m
         drawable.name = name
+        context.view_layer.update()
+        normalize_drawable(drawable, piv, turn)
         context.view_layer.update()
 
         # ---- collision
