@@ -18,7 +18,13 @@ namespace DoorCore
                 var p = (string)req["path"]; var data = File.ReadAllBytes(p);
                 if (p.EndsWith(".ymap")) { var y = new YmapFile(); RpfFile.LoadResourceFile(y, data, 2); return new JsonObject { ["xml"] = MetaXml.GetXml(y, out _) }; }
                 if (p.EndsWith(".ytyp")) { var y = new YtypFile(); RpfFile.LoadResourceFile(y, data, 2); return new JsonObject { ["xml"] = MetaXml.GetXml(y, out _) }; }
-                throw new Exception("xml: .ymap or .ytyp");
+                if (p.EndsWith(".ybn")) { var y = new YbnFile(); RpfFile.LoadResourceFile(y, data, 43); File.WriteAllText((string)req["out"], YbnXml.GetXml(y)); return new JsonObject { ["ok"] = true }; }
+                throw new Exception("xml: .ymap or .ytyp or .ybn");
+            }
+            if (what == "ybnfromxml")
+            {
+                var y = XmlYbn.GetYbn(File.ReadAllText((string)req["path"]));
+                var data = y.Save(); File.WriteAllBytes((string)req["out"], data); return new JsonObject { ["bytes"] = data.Length };
             }
             if (what == "fromxml")
             {
