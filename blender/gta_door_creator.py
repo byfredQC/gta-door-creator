@@ -5,7 +5,7 @@
 bl_info = {
     "name": "GTA Door Creator (Sollumz)",
     "author": "byfred",
-    "version": (1, 4, 1),
+    "version": (1, 4, 2),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar (N) > Sollumz Tools > GTA Door Creator",
     "description": "Make GTA V / FiveM doors: pivot, collision, ytyp, sound and FiveM resource - with Sollumz",
@@ -623,8 +623,14 @@ class GDC_OT_make(bpy.types.Operator):
         bc, bs = (bmn + bmx) * 0.5, bmx - bmn
         bm.transform(Matrix.Translation(-bc))
         bm.transform(Matrix.Diagonal((size.x / max(bs.x, 1e-6), size.y / max(bs.y, 1e-6), size.z / max(bs.z, 1e-6), 1)))
-        bm.transform(Matrix.Translation((lmn + lmx) * 0.5))
         bm.update()
+        # the box must sit on its object origin: Sollumz writes the object position as the bound centre
+        # (vertices moved inside the mesh are ignored -> the collision ended up centred on the pivot in game)
+        box.location = (lmn + lmx) * 0.5
+        box.rotation_euler = (0, 0, 0)
+        box.scale = (1, 1, 1)
+        comp.rotation_euler = (0, 0, 0)
+        comp.scale = (1, 1, 1)
         box.data.materials.clear()
         bpy.ops.object.select_all(action="DESELECT")
         box.select_set(True)
