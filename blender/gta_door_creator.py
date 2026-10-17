@@ -5,7 +5,7 @@
 bl_info = {
     "name": "GTA Door Creator (Sollumz)",
     "author": "byfred",
-    "version": (1, 4, 0),
+    "version": (1, 4, 1),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar (N) > Sollumz Tools > GTA Door Creator",
     "description": "Make GTA V / FiveM doors: pivot, collision, ytyp, sound and FiveM resource - with Sollumz",
@@ -309,8 +309,34 @@ def pivot_point(an, props):
         lo, hi = an["min"][wa], an["max"][wa]
         left, right = (lo, hi) if le == "min" else (hi, lo)
         p[wa] = left if props.hinge == "LEFT" else right
+    elif is_side_slide(props):
+        # like the GTA gates (prop_facgate_08): origin on the leading edge, the leaf runs along local -X
+        p[wa] = an[slide_end(an, props)][wa]
     p[ta] = an["center"][ta]
     return p
+
+
+def is_side_slide(props):
+    return props.door_type == "SLIDING" and props.slide_dir in ("LEFT", "RIGHT")
+
+
+def slide_end(an, props):
+    """'min' / 'max' end of the width axis the leaf slides towards (front view left / right)"""
+    le = left_end(an)
+    re_ = "min" if le == "max" else "max"
+    return le if props.slide_dir == "LEFT" else re_
+
+
+def model_turn(an, props):
+    """rotation of the drawable so that local +X is the width axis (and, for side sliding, the opening direction)"""
+    if props.door_type == "NORMAL":
+        return Matrix.Identity(4)
+    wa = an["wa"]
+    sign = 1.0
+    if is_side_slide(props):
+        sign = 1.0 if slide_end(an, props) == "max" else -1.0
+    u = Vector((sign, 0, 0)) if wa == 0 else Vector((0, sign, 0))
+    return Matrix.Rotation(math.atan2(u.y, u.x), 4, "Z")
 
 
 # ---------------------------------------------------------------------------- properties
@@ -329,7 +355,7 @@ def _preview_update(self, context):
         if self.slide_dir == "UP":
             off = Vector((0, 0, float(d.get("gdc_height", 2.0))))
         else:
-            off = axis * w * (1 if self.slide_dir == "RIGHT" else -1)
+            off = (base.to_3x3() @ Vector((1, 0, 0))).normalized() * w   # local +X = opening direction
         m = Matrix.Translation(off * t) @ base
     else:
         m = Matrix.Translation(Vector((0, 0, float(d.get("gdc_height", 2.5)) * t))) @ base
@@ -464,7 +490,7 @@ class GDC_OT_make(bpy.types.Operator):
         piv = pivot_point(an, p)
         # GTA slides a door along its LOCAL X axis: if the width runs along world Y, turn the model so X = width
         # (the object gets +90° so it still looks the same in Blender; place it with that heading in CodeWalker)
-        turn = Matrix.Rotation(math.radians(90), 4, "Z") if (p.door_type != "NORMAL" and an["wa"] == 1) else Matrix.Identity(4)
+        turn = model_turn(an, p)
 
         if drawable is None:
             # plain meshes: bake their transform, then put the pivot at the world origin and let Sollumz make the Drawable
